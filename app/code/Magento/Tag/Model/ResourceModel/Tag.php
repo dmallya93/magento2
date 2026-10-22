@@ -161,6 +161,56 @@ class Tag extends AbstractDb
     }
 
     /**
+     * Delete the tag with tag.delete start/result logging (Project Spec section 14)
+     *
+     * Exceptions (including the non-admin guard rejection from the model's beforeDelete()) are rethrown unchanged.
+     *
+     * @param AbstractModel $object
+     * @return $this
+     * @throws \Exception
+     */
+    public function delete(AbstractModel $object)
+    {
+        $startTime = microtime(true);
+        $context = [
+            'module' => LogContext::MODULE,
+            'operation' => 'tag.delete',
+            'operation_id' => $this->operationIdGenerator->getOperationId(),
+            'tag_id' => $object->getId(),
+        ];
+        $this->logger->info(
+            'Tag delete started',
+            LogContext::merge(
+                $context,
+                ['before_status' => $object->getOrigData('status') ?? $object->getData('status')]
+            )
+        );
+        try {
+            parent::delete($object);
+        } catch (\Throwable $e) {
+            $this->logger->error(
+                'Tag delete failed',
+                LogContext::merge($context, [
+                    'outcome' => 'failure',
+                    'error_code' => ErrorCodeResolver::resolve($e, 'tag.delete'),
+                    'tag_name' => $object->getData('name'),
+                    'exception' => $e->getMessage(),
+                    'duration_ms' => LogContext::durationMs($startTime),
+                ])
+            );
+            throw $e;
+        }
+        $this->logger->info(
+            'Tag delete completed',
+            LogContext::merge($context, [
+                'outcome' => 'success',
+                'duration_ms' => LogContext::durationMs($startTime),
+            ])
+        );
+        return $this;
+    }
+
+    /**
      * Loading tag by name (name truncated to 255 multibyte characters before the lookup)
      *
      * @param TagModel|DataObject $model
@@ -442,60 +492,83 @@ class Tag extends AbstractDb
     {
         $tagId = (int)$object->getId();
         $storeId = (int)$object->getData('store');
+        $startTime = microtime(true);
+        $context = [
+            'module' => LogContext::MODULE,
+            'operation' => 'tag.aggregate',
+            'operation_id' => $this->operationIdGenerator->getOperationId(),
+            'tag_id' => $tagId,
+        ];
+        $this->logger->info(
+            'Tag summary aggregation started',
+            LogContext::merge($context, ['store_id' => $storeId])
+        );
 
-        // create final summary from existing data and add specified base popularity
-        $finalSummary = $this->_getExistingBasePopularity($tagId);
-        if ($object->hasData('base_popularity') && $storeId) {
-            $finalSummary[$storeId]['store_id'] = $storeId;
-            $finalSummary[$storeId]['base_popularity'] = $object->getData('base_popularity');
-        }
-
-        // calculate aggregation data
-        $summaries = $this->_getAggregationPerStoreView($tagId);
-        $summariesGlobal = $this->_getGlobalAggregation($tagId);
-        if ($summariesGlobal) {
-            $summaries[] = $summariesGlobal;
-        }
-
-        // override final summary with aggregated data
-        foreach ($summaries as $row) {
-            $storeId = (int)$row['store_id'];
-            foreach ($row as $key => $value) {
-                $finalSummary[$storeId][$key] = $value;
+        try {
+            // create final summary from existing data and add specified base popularity
+            $finalSummary = $this->_getExistingBasePopularity($tagId);
+            if ($object->hasData('base_popularity') && $storeId) {
+                $finalSummary[$storeId]['store_id'] = $storeId;
+                $finalSummary[$storeId]['base_popularity'] = $object->getData('base_popularity');
             }
-        }
 
-        // prepare static parameters to final summary for insertion
-        foreach ($finalSummary as $key => $row) {
-            $finalSummary[$key]['tag_id'] = $tagId;
-            foreach (['base_popularity', 'popularity', 'historical_uses', 'uses', 'products', 'customers'] as $str) {
-                if (!isset($row[$str])) {
-                    $finalSummary[$key][$str] = 0;
+            // calculate aggregation data
+            $summaries = $this->_getAggregationPerStoreView($tagId);
+            $summariesGlobal = $this->_getGlobalAggregation($tagId);
+            if ($summariesGlobal) {
+                $summaries[] = $summariesGlobal;
+            }
+
+            // override final summary with aggregated data
+            foreach ($summaries as $row) {
+                $storeId = (int)$row['store_id'];
+                foreach ($row as $key => $value) {
+                    $finalSummary[$storeId][$key] = $value;
                 }
             }
 
-            $finalSummary[$key]['popularity'] = $finalSummary[$key]['historical_uses'];
+            // prepare static parameters to final summary for insertion
+            foreach ($finalSummary as $key => $row) {
+                $finalSummary[$key]['tag_id'] = $tagId;
+                $columns = ['base_popularity', 'popularity', 'historical_uses', 'uses', 'products', 'customers'];
+                foreach ($columns as $str) {
+                    if (!isset($row[$str])) {
+                        $finalSummary[$key][$str] = 0;
+                    }
+                }
+
+                $finalSummary[$key]['popularity'] = $finalSummary[$key]['historical_uses'];
+            }
+
+            // remove old and insert new data
+            $connection = $this->getConnection();
+            $connection->delete(
+                $this->getTable('tag_summary'),
+                ['tag_id = ?' => $tagId]
+            );
+            if (!empty($finalSummary)) {
+                $connection->insertMultiple($this->getTable('tag_summary'), array_values($finalSummary));
+            }
+        } catch (\Throwable $e) {
+            $this->logger->error(
+                'Tag summary aggregation failed',
+                LogContext::merge($context, [
+                    'outcome' => 'failure',
+                    'error_code' => 'tag.aggregate.failed',
+                    'exception' => $e->getMessage(),
+                    'duration_ms' => LogContext::durationMs($startTime),
+                ])
+            );
+            throw $e;
         }
 
-        // remove old and insert new data
-        $connection = $this->getConnection();
-        $connection->delete(
-            $this->getTable('tag_summary'),
-            ['tag_id = ?' => $tagId]
-        );
-        if (!empty($finalSummary)) {
-            $connection->insertMultiple($this->getTable('tag_summary'), array_values($finalSummary));
-        }
-
-        $this->logger->debug(
-            'Tag summary aggregated',
-            [
-                'module' => LogContext::MODULE,
-                'operation' => 'tag.aggregate',
-                'operation_id' => $this->operationIdGenerator->getOperationId(),
-                'tag_id' => $tagId,
+        $this->logger->info(
+            'Tag summary aggregation completed',
+            LogContext::merge($context, [
+                'outcome' => 'success',
                 'summary_rows' => count($finalSummary),
-            ]
+                'duration_ms' => LogContext::durationMs($startTime),
+            ])
         );
 
         return $object;
@@ -513,11 +586,42 @@ class Tag extends AbstractDb
             return 0;
         }
 
-        return $this->getConnection()->update(
-            $this->getTable('tag_summary'),
-            ['products' => new Expression('products - 1')],
-            ['tag_id IN (?)' => $tagsId]
+        $startTime = microtime(true);
+        $context = [
+            'module' => LogContext::MODULE,
+            'operation' => 'tag.decrement_products',
+            'operation_id' => $this->operationIdGenerator->getOperationId(),
+            'tag_ids' => array_values($tagsId),
+        ];
+        $this->logger->info('Tag summary product decrement started', $context);
+        try {
+            $affected = $this->getConnection()->update(
+                $this->getTable('tag_summary'),
+                ['products' => new Expression('products - 1')],
+                ['tag_id IN (?)' => $tagsId]
+            );
+        } catch (\Throwable $e) {
+            $this->logger->error(
+                'Tag summary product decrement failed',
+                LogContext::merge($context, [
+                    'outcome' => 'failure',
+                    'error_code' => 'tag.decrement_products.failed',
+                    'exception' => $e->getMessage(),
+                    'duration_ms' => LogContext::durationMs($startTime),
+                ])
+            );
+            throw $e;
+        }
+        $this->logger->info(
+            'Tag summary product decrement completed',
+            LogContext::merge($context, [
+                'outcome' => 'success',
+                'affected_count' => (int)$affected,
+                'duration_ms' => LogContext::durationMs($startTime),
+            ])
         );
+
+        return $affected;
     }
 
     /**

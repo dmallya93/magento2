@@ -11,8 +11,10 @@ use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\DataObject;
 use Magento\Framework\DB\Adapter\AdapterInterface;
 use Magento\Framework\DB\Select;
+use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Model\Context as ModelContext;
 use Magento\Framework\Model\ResourceModel\Db\Context;
+use Magento\Framework\Model\ResourceModel\Db\TransactionManagerInterface;
 use Magento\Framework\Registry;
 use Magento\Framework\Stdlib\DateTime\DateTime;
 use Magento\Framework\Stdlib\StringUtils;
@@ -106,6 +108,9 @@ class TagTest extends TestCase
 
         $contextMock = $this->createMock(Context::class);
         $contextMock->method('getResources')->willReturn($resourceConnectionMock);
+        $transactionManagerMock = $this->createMock(TransactionManagerInterface::class);
+        $transactionManagerMock->method('start')->willReturnArgument(0);
+        $contextMock->method('getTransactionManager')->willReturn($transactionManagerMock);
 
         $this->adminContextMock = $this->createMock(AdminContext::class);
         $this->adminContextMock->method('isAdminContext')->willReturn(false);
@@ -487,6 +492,115 @@ class TagTest extends TestCase
         $this->assertSame($this->resource, $this->invokeAfterSave($tag));
 
         $this->assertSame([], $this->logsByOperation('tag.name.duplicate_detected'));
+    }
+
+    /**
+     * A tag delete rejected inside the delete transaction is logged as tag.delete start + failure and rethrown
+     *
+     * @return void
+     */
+    public function testDeleteFailureIsLoggedAndRethrown(): void
+    {
+        $tag = $this->createMock(Tag::class);
+        $tag->method('getId')->willReturn(7);
+        $tag->method('getData')->willReturnCallback(fn ($key = '') => $key === 'name' ? 'red' : null);
+        $tag->method('beforeDelete')
+            ->willThrowException(new LocalizedException(__('Cannot complete this operation from non-admin area.')));
+
+        try {
+            $this->resource->delete($tag);
+            $this->fail('Exception expected');
+        } catch (LocalizedException $e) {
+            $this->assertSame('Cannot complete this operation from non-admin area.', $e->getMessage());
+        }
+
+        $entries = $this->logsByOperation('tag.delete');
+        $this->assertCount(2, $entries);
+        $this->assertSame(['info', 'Tag delete started'], [$entries[0][0], $entries[0][1]]);
+        $this->assertSame(7, $entries[0][2]['tag_id']);
+        $this->assertSame(self::OPERATION_ID, $entries[0][2]['operation_id']);
+        $this->assertSame('error', $entries[1][0]);
+        $this->assertSame('failure', $entries[1][2]['outcome']);
+        $this->assertSame('tag.delete.failed', $entries[1][2]['error_code']);
+        $this->assertArrayHasKey('duration_ms', $entries[1][2]);
+    }
+
+    /**
+     * decrementProducts() logs start + completion with the affected row count
+     *
+     * @return void
+     */
+    public function testDecrementProductsLogsStartAndResult(): void
+    {
+        $this->connectionMock->expects($this->once())->method('update')->willReturn(2);
+
+        $this->assertSame(2, $this->resource->decrementProducts([3, 4]));
+
+        $entries = $this->logsByOperation('tag.decrement_products');
+        $this->assertCount(2, $entries);
+        $this->assertSame([3, 4], $entries[0][2]['tag_ids']);
+        $this->assertSame('success', $entries[1][2]['outcome']);
+        $this->assertSame(2, $entries[1][2]['affected_count']);
+        $this->assertArrayHasKey('duration_ms', $entries[1][2]);
+    }
+
+    /**
+     * decrementProducts() with no tag ids does nothing and logs nothing (M1 early return)
+     *
+     * @return void
+     */
+    public function testDecrementProductsWithNoTagsIsNoop(): void
+    {
+        $this->connectionMock->expects($this->never())->method('update');
+
+        $this->assertSame(0, $this->resource->decrementProducts([]));
+        $this->assertSame([], $this->logsByOperation('tag.decrement_products'));
+    }
+
+    /**
+     * A failing summary rewrite is logged as tag.aggregate failure with an error_code and rethrown
+     *
+     * @return void
+     */
+    public function testAggregateFailureIsLoggedAndRethrown(): void
+    {
+        $this->connectionMock->method('fetchAll')->willReturn([]);
+        $this->connectionMock->method('fetchAssoc')->willReturn([]);
+        $this->connectionMock->method('delete')->willThrowException(new \RuntimeException('lock wait timeout'));
+
+        try {
+            $this->resource->aggregate($this->createTag(['tag_id' => 9]));
+            $this->fail('Exception expected');
+        } catch (\RuntimeException $e) {
+            $this->assertSame('lock wait timeout', $e->getMessage());
+        }
+
+        $entries = $this->logsByOperation('tag.aggregate');
+        $this->assertCount(2, $entries);
+        $this->assertSame('Tag summary aggregation started', $entries[0][1]);
+        $this->assertSame('error', $entries[1][0]);
+        $this->assertSame('tag.aggregate.failed', $entries[1][2]['error_code']);
+        $this->assertArrayHasKey('duration_ms', $entries[1][2]);
+    }
+
+    /**
+     * A successful aggregation logs start + completion with outcome and duration_ms
+     *
+     * @return void
+     */
+    public function testAggregateLogsStartAndResult(): void
+    {
+        $this->connectionMock->method('fetchAll')->willReturn([]);
+        $this->connectionMock->method('fetchAssoc')->willReturn([]);
+        $this->connectionMock->expects($this->once())->method('delete');
+
+        $this->resource->aggregate($this->createTag(['tag_id' => 9]));
+
+        $entries = $this->logsByOperation('tag.aggregate');
+        $this->assertCount(2, $entries);
+        $this->assertSame('success', $entries[1][2]['outcome']);
+        $this->assertSame(0, $entries[1][2]['summary_rows']);
+        $this->assertArrayHasKey('duration_ms', $entries[1][2]);
     }
 
     /**
