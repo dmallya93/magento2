@@ -170,5 +170,5 @@ def make_rel(tag_id, customer_id, product_id, store_id, active=1):
     return ok(
         "relation_save",
         data={"tag_id": tag_id, "customer_id": customer_id, "product_id": product_id,
-              "store_id": store_id, "active": active},
+              "store_id": store_id, "active": active, "created_at": "2026-01-01 00:00:00"},
     )["tag_relation_id"]

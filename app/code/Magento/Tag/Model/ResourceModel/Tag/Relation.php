@@ -7,7 +7,6 @@ declare(strict_types=1);
 
 namespace Magento\Tag\Model\ResourceModel\Tag;
 
-use Magento\Framework\Model\AbstractModel;
 use Magento\Framework\Model\ResourceModel\Db\AbstractDb;
 use Magento\Framework\Model\ResourceModel\Db\Context;
 use Magento\Framework\Stdlib\DateTime\DateTime;
@@ -63,20 +62,6 @@ class Relation extends AbstractDb
     protected function _construct()
     {
         $this->_init('tag_relation', 'tag_relation_id');
-    }
-
-    /**
-     * Fill created_at for new relations when the caller did not provide it
-     *
-     * @param AbstractModel $object
-     * @return $this
-     */
-    protected function _beforeSave(AbstractModel $object)
-    {
-        if (!$object->getId() && !$object->getData('created_at')) {
-            $object->setData('created_at', $this->dateTime->gmtDate());
-        }
-        return parent::_beforeSave($object);
     }
 
     /**
