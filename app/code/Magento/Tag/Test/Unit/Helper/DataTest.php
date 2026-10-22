@@ -11,6 +11,7 @@ use Magento\Framework\App\Helper\Context;
 use Magento\Tag\Helper\Data;
 use Magento\Tag\Model\OperationIdGenerator;
 use Magento\Tag\Model\Tag;
+use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -19,6 +20,7 @@ use Psr\Log\LoggerInterface;
 /**
  * Unit tests for \Magento\Tag\Helper\Data (port of Mage_Tag_Helper_Data)
  */
+#[AllowMockObjectsWithoutExpectations]
 class DataTest extends TestCase
 {
     private const OPERATION_ID = '6f1c2a3e-1b2c-4d5e-8f90-0123456789ab';

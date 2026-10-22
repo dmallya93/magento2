@@ -9,10 +9,12 @@ namespace Magento\Tag\Test\Unit\Model;
 
 use Magento\Framework\DataObject\IdentityGeneratorInterface;
 use Magento\Tag\Model\OperationIdGenerator;
+use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
+#[AllowMockObjectsWithoutExpectations]
 #[CoversClass(OperationIdGenerator::class)]
 class OperationIdGeneratorTest extends TestCase
 {
