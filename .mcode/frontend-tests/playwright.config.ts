@@ -5,9 +5,9 @@ export default defineConfig({
   retries: 1,
   workers: 1,
   use: {
-    baseURL: "http://127.0.0.1:8082",
+    baseURL: process.env.BASE_URL || `http://127.0.0.1:${process.env.MAGENTO_PORT || 8082}`,
     headless: true,
-    launchOptions: { executablePath: process.env.CHROME_PATH || "/l2l/.agent-browser/browsers/chrome-156.0.8078.47/chrome", args: ["--no-sandbox"] },
+    launchOptions: { ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}), args: ["--no-sandbox"] },
     screenshot: "on",
     video: "off",
     trace: "retain-on-failure",
