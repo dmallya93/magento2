@@ -72,3 +72,11 @@ atlassian*
 /generated/*
 !/generated/.htaccess
 .DS_Store
+
+# Python functional-testing artifacts
+.venv/
+venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+*.pyo
