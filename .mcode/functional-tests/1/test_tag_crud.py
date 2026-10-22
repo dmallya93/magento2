@@ -1,7 +1,7 @@
 """CRUD through Magento\\Tag\\Model\\Tag / TagRelation against the real DB, plus FK integrity."""
 import uuid
 
-from conftest import (STATUS_APPROVED, STATUS_DISABLED, STATUS_PENDING, db_query, harness, make_rel, make_tag, ok)
+from conftest import (STATUS_APPROVED, STATUS_PENDING, db_query, harness, make_rel, make_tag, ok)
 
 
 class TestTagCrud:
