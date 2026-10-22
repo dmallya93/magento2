@@ -112,13 +112,6 @@ class Tag extends AbstractModel implements IdentityInterface
     protected $_eventPrefix = 'tag';
 
     /**
-     * Event object name
-     *
-     * @var string
-     */
-    protected $_eventObject = 'tag';
-
-    /**
      * This flag means should we or not add base popularity on tag load
      *
      * @var bool

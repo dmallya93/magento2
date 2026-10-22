@@ -19,6 +19,9 @@ use Psr\Log\LoggerInterface;
 /**
  * Tag relation model (port of Mage_Tag_Model_Tag_Relation)
  *
+ * Event prefix intentionally 'tag_relation' (M1 dispatched generic core_abstract_* events);
+ * payload key remains 'object' as in M1.
+ *
  * @method int getActive()
  * @method array getAddedProductIds()
  * @method int getCustomerId()
@@ -64,13 +67,6 @@ class TagRelation extends AbstractModel implements IdentityInterface
      * @var string
      */
     protected $_eventPrefix = 'tag_relation';
-
-    /**
-     * Event object name
-     *
-     * @var string
-     */
-    protected $_eventObject = 'tag_relation';
 
     /**
      * @var LoggerInterface
