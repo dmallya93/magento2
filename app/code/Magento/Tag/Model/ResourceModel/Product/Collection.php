@@ -18,6 +18,7 @@ use Magento\Customer\Api\GroupManagementInterface;
 use Magento\Framework\DB\Select;
 use Magento\Framework\EntityManager\MetadataPool;
 use Magento\Framework\Indexer\DimensionFactory;
+use Magento\Tag\Model\Logging\Context as LogContext;
 use Magento\Tag\Model\OperationIdGenerator;
 use Magento\Tag\Model\ResourceModel\Tag\CollectionFactory as TagCollectionFactory;
 use Magento\Tag\Model\TagRelation;
@@ -649,13 +650,13 @@ class Collection extends \Magento\Catalog\Model\ResourceModel\Product\Collection
     private function logCollectionLoad(float $startedAt, ?\Throwable $exception = null): void
     {
         $context = [
-            'module' => 'Magento_Tag',
+            'module' => LogContext::MODULE,
             'operation' => 'collection.load',
             'operation_id' => $this->operationIdGenerator->getOperationId(),
             'collection_class' => static::class,
             'filter_count' => count((array)$this->getSelect()->getPart(Select::WHERE))
                 + count((array)$this->getSelect()->getPart(Select::HAVING)),
-            'duration_ms' => round((microtime(true) - $startedAt) * 1000, 2),
+            'duration_ms' => LogContext::durationMs($startedAt),
         ];
 
         if ($exception !== null) {

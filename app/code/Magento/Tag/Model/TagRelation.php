@@ -14,6 +14,7 @@ use Magento\Framework\Model\AbstractModel;
 use Magento\Framework\Model\Context;
 use Magento\Framework\Model\ResourceModel\AbstractResource;
 use Magento\Framework\Registry;
+use Magento\Tag\Model\Logging\Context as LogContext;
 use Magento\Tag\Model\Logging\ErrorCodeResolver;
 use Psr\Log\LoggerInterface;
 
@@ -59,8 +60,6 @@ class TagRelation extends AbstractModel implements IdentityInterface
      * Cache tag (IdentityInterface)
      */
     public const CACHE_TAG = 'tag_relation';
-
-    private const LOG_MODULE = 'Magento_Tag';
 
     /**
      * Event prefix for observer
@@ -202,7 +201,7 @@ class TagRelation extends AbstractModel implements IdentityInterface
     {
         $startTime = microtime(true);
         $context = [
-            'module' => self::LOG_MODULE,
+            'module' => LogContext::MODULE,
             'operation' => 'relation.deactivate',
             'operation_id' => $this->operationIdGenerator->getOperationId(),
             'tag_id' => $this->getTagId(),
@@ -211,30 +210,30 @@ class TagRelation extends AbstractModel implements IdentityInterface
         $beforeActive = $this->getData('active');
         $this->logger->info(
             'Tag relation deactivation started',
-            $context + ['before_active' => $beforeActive === null ? null : (int)$beforeActive]
+            LogContext::merge($context, ['before_active' => $beforeActive === null ? null : (int)$beforeActive])
         );
         try {
             $this->_getResource()->deactivate($this->getTagId(), $this->getCustomerId());
         } catch (\Throwable $e) {
             $this->logger->error(
                 'Tag relation deactivation failed',
-                $context + [
+                LogContext::merge($context, [
                     'outcome' => 'failure',
                     'error_code' => 'relation.deactivate.failed',
                     'exception' => $e->getMessage(),
-                    'duration_ms' => $this->getDurationMs($startTime),
-                ]
+                    'duration_ms' => LogContext::durationMs($startTime),
+                ])
             );
             throw $e;
         }
         $this->logger->info(
             'Tag relation deactivation completed',
-            $context + [
+            LogContext::merge($context, [
                 'outcome' => 'success',
                 'before_active' => $beforeActive === null ? null : (int)$beforeActive,
                 'after_active' => self::STATUS_NOT_ACTIVE,
-                'duration_ms' => $this->getDurationMs($startTime),
-            ]
+                'duration_ms' => LogContext::durationMs($startTime),
+            ])
         );
         return $this;
     }
@@ -260,7 +259,7 @@ class TagRelation extends AbstractModel implements IdentityInterface
         $this->setStoreId($model->getStore());
 
         $context = [
-            'module' => self::LOG_MODULE,
+            'module' => LogContext::MODULE,
             'operation' => 'relation.batch_save',
             'operation_id' => $this->operationIdGenerator->getOperationId(),
             'tag_id' => $this->getTagId(),
@@ -273,35 +272,25 @@ class TagRelation extends AbstractModel implements IdentityInterface
         } catch (\Throwable $e) {
             $this->logger->error(
                 'Tag relation batch save failed',
-                $context + [
+                LogContext::merge($context, [
                     'outcome' => 'failure',
                     'error_code' => ErrorCodeResolver::resolve($e, 'relation.save'),
                     'exception' => $e->getMessage(),
-                    'duration_ms' => $this->getDurationMs($startTime),
-                ]
+                    'duration_ms' => LogContext::durationMs($startTime),
+                ])
             );
             throw $e;
         }
         $this->logger->info(
             'Tag relation batch save completed',
-            $context + [
+            LogContext::merge($context, [
                 'outcome' => 'success',
                 'inserted_product_ids' => array_values((array)$this->getData('inserted_product_ids')),
                 'deleted_product_ids' => array_values((array)$this->getData('deleted_product_ids')),
-                'duration_ms' => $this->getDurationMs($startTime),
-            ]
+                'duration_ms' => LogContext::durationMs($startTime),
+            ])
         );
         return $this;
     }
 
-    /**
-     * Elapsed milliseconds since $startTime
-     *
-     * @param float $startTime
-     * @return float
-     */
-    private function getDurationMs(float $startTime): float
-    {
-        return round((microtime(true) - $startTime) * 1000, 2);
-    }
 }

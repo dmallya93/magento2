@@ -19,6 +19,7 @@ use Magento\Framework\Registry;
 use Magento\Framework\Stdlib\DateTime\DateTime;
 use Magento\Framework\UrlInterface;
 use Magento\Store\Model\StoreManagerInterface;
+use Magento\Tag\Model\Logging\Context as LogContext;
 use Magento\Tag\Model\Logging\ErrorCodeResolver;
 use Magento\Tag\Model\ResourceModel\Customer\Collection as CustomerCollection;
 use Magento\Tag\Model\ResourceModel\Customer\CollectionFactory as CustomerCollectionFactory;
@@ -99,8 +100,6 @@ class Tag extends AbstractModel implements IdentityInterface
     public const CHANGE_RELATION_REACTIVATED = 'relation_reactivated';
     public const CHANGE_TAG_REOPENED_AND_RELATION_CREATED = 'tag_reopened_and_relation_created';
     public const CHANGE_NONE = 'none';
-
-    private const LOG_MODULE = 'Magento_Tag';
 
     /**
      * Event prefix for observer
@@ -589,7 +588,7 @@ class Tag extends AbstractModel implements IdentityInterface
         $startTime = microtime(true);
         $statusBefore = $this->getStatus();
         $context = [
-            'module' => self::LOG_MODULE,
+            'module' => LogContext::MODULE,
             'operation_id' => $this->operationIdGenerator->getOperationId(),
             'tag_id' => $this->getId(),
             'customer_id' => $customerId,
@@ -598,7 +597,7 @@ class Tag extends AbstractModel implements IdentityInterface
         ];
         $this->logger->info(
             'Tag relation save started',
-            ['operation' => 'relation.save', 'status' => $statusBefore] + $context
+            LogContext::merge($context, ['operation' => 'relation.save', 'status' => $statusBefore])
         );
 
         $decisionPath = null;
@@ -683,24 +682,24 @@ class Tag extends AbstractModel implements IdentityInterface
             if ($decisionPath !== null) {
                 $this->logger->info(
                     'Tag relation decision made',
-                    [
+                    LogContext::merge($context, [
                         'operation' => 'relation.decide',
                         'decision_path' => $decisionPath,
                         'result_code' => $result,
                         'persisted_change' => $persistedChange,
                         'tag_status_before' => $statusBefore,
                         'inactive_links_counted' => $inactiveLinksCounted,
-                    ] + $context
+                    ])
                 );
             } else {
                 // M1 falls through the switch for an unknown status: nothing is saved and '' is returned.
                 $this->logger->warning(
                     'Tag relation decision skipped: unknown tag status',
-                    [
+                    LogContext::merge($context, [
                         'operation' => 'relation.decide_skipped',
                         'error_code' => 'relation.decide.unknown_status',
                         'tag_status_before' => $statusBefore,
-                    ] + $context
+                    ])
                 );
             }
 
@@ -709,13 +708,13 @@ class Tag extends AbstractModel implements IdentityInterface
                 $this->setStatus($this->getPendingStatus())->save();
                 $this->logger->warning(
                     'Disabled tag automatically reopened to pending by customer submission',
-                    [
+                    LogContext::merge($context, [
                         'operation' => 'tag.status.auto_reopened',
                         'error_code' => 'tag.status.auto_reopened',
                         'previous_status' => self::STATUS_DISABLED,
                         'new_status' => self::STATUS_PENDING,
                         'scope' => 'global',
-                    ] + $context
+                    ])
                 );
             }
 
@@ -725,29 +724,29 @@ class Tag extends AbstractModel implements IdentityInterface
         } catch (\Throwable $e) {
             $this->logger->error(
                 'Tag relation save failed',
-                [
+                LogContext::merge($context, [
                     'operation' => 'relation.save',
                     'outcome' => 'failure',
                     'error_code' => ErrorCodeResolver::resolve($e, 'relation.save'),
                     'decision_path' => $decisionPath,
                     'exception' => $e->getMessage(),
-                    'duration_ms' => $this->getDurationMs($startTime),
-                ] + $context
+                    'duration_ms' => LogContext::durationMs($startTime),
+                ])
             );
             throw $e;
         }
 
         $this->logger->info(
             'Tag relation save completed',
-            [
+            LogContext::merge($context, [
                 'operation' => 'relation.save',
                 'outcome' => $decisionPath === null ? 'skipped' : 'success',
                 'result_code' => $result,
                 'decision_path' => $decisionPath,
                 'persisted_change' => $persistedChange,
                 'status' => $this->getStatus(),
-                'duration_ms' => $this->getDurationMs($startTime),
-            ] + $context
+                'duration_ms' => LogContext::durationMs($startTime),
+            ])
         );
 
         return $result;
@@ -828,14 +827,4 @@ class Tag extends AbstractModel implements IdentityInterface
         return parent::afterSave();
     }
 
-    /**
-     * Elapsed milliseconds since $startTime
-     *
-     * @param float $startTime
-     * @return float
-     */
-    private function getDurationMs(float $startTime): float
-    {
-        return round((microtime(true) - $startTime) * 1000, 2);
-    }
 }

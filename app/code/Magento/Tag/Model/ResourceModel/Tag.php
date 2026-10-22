@@ -15,6 +15,7 @@ use Magento\Framework\Model\ResourceModel\Db\AbstractDb;
 use Magento\Framework\Model\ResourceModel\Db\Context;
 use Magento\Framework\Stdlib\StringUtils;
 use Magento\Tag\Model\AdminContext;
+use Magento\Tag\Model\Logging\Context as LogContext;
 use Magento\Tag\Model\Logging\ErrorCodeResolver;
 use Magento\Tag\Model\OperationIdGenerator;
 use Magento\Tag\Model\Tag as TagModel;
@@ -31,8 +32,6 @@ class Tag extends AbstractDb
      * Maximum stored tag name length (multibyte characters)
      */
     public const MAX_NAME_LENGTH = 255;
-
-    private const LOG_MODULE = 'Magento_Tag';
 
     /**
      * @var StringUtils
@@ -118,18 +117,18 @@ class Tag extends AbstractDb
     {
         $startTime = microtime(true);
         $context = [
-            'module' => self::LOG_MODULE,
+            'module' => LogContext::MODULE,
             'operation' => 'tag.save',
             'operation_id' => $this->operationIdGenerator->getOperationId(),
             'tag_id' => $object->getId(),
         ];
         $this->logger->info(
             'Tag save started',
-            $context + [
+            LogContext::merge($context, [
                 'is_new' => !$object->getId(),
                 'before_status' => $object->getOrigData('status'),
                 'requested_status' => $object->getData('status'),
-            ]
+            ])
         );
         try {
             parent::save($object);
@@ -137,13 +136,13 @@ class Tag extends AbstractDb
             unset($this->mergedObjects[spl_object_id($object)]);
             $this->logger->error(
                 'Tag save failed',
-                array_merge($context, [
+                LogContext::merge($context, [
                     'outcome' => 'failure',
                     'error_code' => ErrorCodeResolver::resolve($e, 'tag.save', 'unique_violation'),
                     'tag_id' => $object->getId(),
                     'tag_name' => $object->getData('name'),
                     'exception' => $e->getMessage(),
-                    'duration_ms' => $this->getDurationMs($startTime),
+                    'duration_ms' => LogContext::durationMs($startTime),
                 ])
             );
             throw $e;
@@ -151,11 +150,11 @@ class Tag extends AbstractDb
         unset($this->mergedObjects[spl_object_id($object)]);
         $this->logger->info(
             'Tag save completed',
-            array_merge($context, [
+            LogContext::merge($context, [
                 'outcome' => 'success',
                 'tag_id' => $object->getId(),
                 'after_status' => $object->getData('status'),
-                'duration_ms' => $this->getDurationMs($startTime),
+                'duration_ms' => LogContext::durationMs($startTime),
             ])
         );
         return $this;
@@ -229,7 +228,7 @@ class Tag extends AbstractDb
                 $this->logger->info(
                     'New approved tag merged into existing pending tag',
                     [
-                        'module' => self::LOG_MODULE,
+                        'module' => LogContext::MODULE,
                         'operation' => 'tag.merge',
                         'operation_id' => $this->operationIdGenerator->getOperationId(),
                         'merged_into_tag_id' => $existing[$this->getIdFieldName()],
@@ -491,7 +490,7 @@ class Tag extends AbstractDb
         $this->logger->debug(
             'Tag summary aggregated',
             [
-                'module' => self::LOG_MODULE,
+                'module' => LogContext::MODULE,
                 'operation' => 'tag.aggregate',
                 'operation_id' => $this->operationIdGenerator->getOperationId(),
                 'tag_id' => $tagId,
@@ -643,7 +642,7 @@ class Tag extends AbstractDb
         $this->logger->warning(
             'Tag name exceeded maximum length and was truncated',
             [
-                'module' => self::LOG_MODULE,
+                'module' => LogContext::MODULE,
                 'operation' => 'tag.name.truncated',
                 'operation_id' => $this->operationIdGenerator->getOperationId(),
                 'error_code' => 'tag.name.truncated',
@@ -678,7 +677,7 @@ class Tag extends AbstractDb
                 $this->logger->warning(
                     'Duplicate tag name detected after tag creation',
                     [
-                        'module' => self::LOG_MODULE,
+                        'module' => LogContext::MODULE,
                         'operation' => 'tag.name.duplicate_detected',
                         'operation_id' => $this->operationIdGenerator->getOperationId(),
                         'error_code' => 'tag.name.duplicate_detected',
@@ -694,14 +693,4 @@ class Tag extends AbstractDb
         }
     }
 
-    /**
-     * Elapsed milliseconds since $startTime
-     *
-     * @param float $startTime
-     * @return float
-     */
-    private function getDurationMs(float $startTime): float
-    {
-        return round((microtime(true) - $startTime) * 1000, 2);
-    }
 }

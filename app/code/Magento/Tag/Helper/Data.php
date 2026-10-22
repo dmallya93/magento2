@@ -10,6 +10,7 @@ namespace Magento\Tag\Helper;
 use Magento\Framework\App\Helper\AbstractHelper;
 use Magento\Framework\App\Helper\Context;
 use Magento\Framework\Phrase;
+use Magento\Tag\Model\Logging\Context as LogContext;
 use Magento\Tag\Model\OperationIdGenerator;
 use Magento\Tag\Model\Tag;
 use Psr\Log\LoggerInterface;
@@ -27,11 +28,6 @@ class Data extends AbstractHelper
      * Regex used by M1 to detect single-quoted phrases and whitespace separators (kept byte-for-byte).
      */
     private const TAG_SPLIT_PATTERN = "/(\'(.*?)\')|(\s+)/i";
-
-    /**
-     * Module name used in log entry context
-     */
-    private const LOG_MODULE = 'Magento_Tag';
 
     /**
      * Operation slug for tag parsing log entries
@@ -123,7 +119,7 @@ class Data extends AbstractHelper
 
         $parsedTags = array_values($this->cleanTags($tokens));
         $this->logger->debug('Tag input parsed', [
-            'module' => self::LOG_MODULE,
+            'module' => LogContext::MODULE,
             'operation' => self::LOG_OPERATION_PARSE,
             'operation_id' => $this->operationIdGenerator->getOperationId(),
             'raw_input' => $rawInput,

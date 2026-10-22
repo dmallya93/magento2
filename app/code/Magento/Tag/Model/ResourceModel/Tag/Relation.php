@@ -10,6 +10,7 @@ namespace Magento\Tag\Model\ResourceModel\Tag;
 use Magento\Framework\Model\ResourceModel\Db\AbstractDb;
 use Magento\Framework\Model\ResourceModel\Db\Context;
 use Magento\Framework\Stdlib\DateTime\DateTime;
+use Magento\Tag\Model\Logging\Context as LogContext;
 use Magento\Tag\Model\OperationIdGenerator;
 use Magento\Tag\Model\TagRelation;
 use Psr\Log\LoggerInterface;
@@ -19,8 +20,6 @@ use Psr\Log\LoggerInterface;
  */
 class Relation extends AbstractDb
 {
-    private const LOG_MODULE = 'Magento_Tag';
-
     /**
      * @var DateTime
      */
@@ -214,7 +213,7 @@ class Relation extends AbstractDb
         $affected = $connection->update($this->getMainTable(), $data, $condition);
 
         $context = [
-            'module' => self::LOG_MODULE,
+            'module' => LogContext::MODULE,
             'operation' => 'relation.deactivate',
             'operation_id' => $this->operationIdGenerator->getOperationId(),
             'tag_id' => $tagId,
@@ -223,17 +222,17 @@ class Relation extends AbstractDb
         if (empty($beforeActive)) {
             $this->logger->warning(
                 'No tag relation found to deactivate',
-                $context + ['outcome' => 'skipped', 'error_code' => 'relation.deactivate.not_found']
+                LogContext::merge($context, ['outcome' => 'skipped', 'error_code' => 'relation.deactivate.not_found'])
             );
         } else {
             $this->logger->info(
                 'Tag relations deactivated',
-                $context + [
+                LogContext::merge($context, [
                     'affected_count' => (int)$affected,
                     'relation_ids' => array_keys($beforeActive),
                     'before_active' => array_map('intval', $beforeActive),
                     'after_active' => TagRelation::STATUS_NOT_ACTIVE,
-                ]
+                ])
             );
         }
         return $this;

@@ -10,6 +10,7 @@ namespace Magento\Tag\Model\ResourceModel\Customer;
 use Magento\Catalog\Model\Product;
 use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductCollectionFactory;
 use Magento\Framework\DB\Select;
+use Magento\Tag\Model\Logging\Context as LogContext;
 use Magento\Tag\Model\OperationIdGenerator;
 
 /**
@@ -523,13 +524,13 @@ class Collection extends \Magento\Customer\Model\ResourceModel\Customer\Collecti
     private function logCollectionLoad(float $startedAt, ?\Throwable $exception = null): void
     {
         $context = [
-            'module' => 'Magento_Tag',
+            'module' => LogContext::MODULE,
             'operation' => 'collection.load',
             'operation_id' => $this->operationIdGenerator->getOperationId(),
             'collection_class' => static::class,
             'filter_count' => count((array)$this->getSelect()->getPart(Select::WHERE))
                 + count((array)$this->getSelect()->getPart(Select::HAVING)),
-            'duration_ms' => round((microtime(true) - $startedAt) * 1000, 2),
+            'duration_ms' => LogContext::durationMs($startedAt),
         ];
 
         if ($exception !== null) {
