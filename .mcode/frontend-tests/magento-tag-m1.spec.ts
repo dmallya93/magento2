@@ -1,13 +1,7 @@
-import { test, expect, Page } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 
 const ADMIN_USER = process.env.ADMIN_USER || "admin";
 const ADMIN_PASS = process.env.ADMIN_PASSWORD ?? process.env.ADMIN_PASS ?? "";
-
-function trackErrors(page: Page) {
-  const errs: string[] = [];
-  page.on("pageerror", (e) => errs.push(e.message));
-  return errs;
-}
 
 test.describe("Storefront core pages with Magento_Tag enabled", () => {
   test("home page renders", async ({ page }) => {
