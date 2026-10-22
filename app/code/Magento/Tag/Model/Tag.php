@@ -8,7 +8,6 @@ declare(strict_types=1);
 namespace Magento\Tag\Model;
 
 use Magento\Catalog\Model\Product;
-use Magento\Framework\App\Area;
 use Magento\Framework\Data\Collection\AbstractDb;
 use Magento\Framework\DataObject\IdentityInterface;
 use Magento\Framework\DB\Adapter\DuplicateException;
@@ -169,6 +168,11 @@ class Tag extends AbstractModel implements IdentityInterface
     private $operationIdGenerator;
 
     /**
+     * @var AdminContext
+     */
+    private $adminContext;
+
+    /**
      * @param Context $context
      * @param Registry $registry
      * @param TagRelationFactory $tagRelationFactory
@@ -181,6 +185,7 @@ class Tag extends AbstractModel implements IdentityInterface
      * @param DateTime $dateTime
      * @param LoggerInterface $logger
      * @param OperationIdGenerator $operationIdGenerator
+     * @param AdminContext $adminContext
      * @param AbstractResource|null $resource
      * @param AbstractDb|null $resourceCollection
      * @param array $data
@@ -198,6 +203,7 @@ class Tag extends AbstractModel implements IdentityInterface
         DateTime $dateTime,
         LoggerInterface $logger,
         OperationIdGenerator $operationIdGenerator,
+        AdminContext $adminContext,
         ?AbstractResource $resource = null,
         ?AbstractDb $resourceCollection = null,
         array $data = []
@@ -212,6 +218,7 @@ class Tag extends AbstractModel implements IdentityInterface
         $this->dateTime = $dateTime;
         $this->logger = $logger;
         $this->operationIdGenerator = $operationIdGenerator;
+        $this->adminContext = $adminContext;
         parent::__construct($context, $registry, $resource, $resourceCollection, $data);
     }
 
@@ -548,7 +555,7 @@ class Tag extends AbstractModel implements IdentityInterface
      * Port of Mage_Core_Model_Abstract::_protectFromNonAdmin()
      *
      * M1 allowed the operation in the secure area or in the admin store (admin panel, API, scripts);
-     * the M2 equivalent of a non-admin store is the storefront (frontend) area.
+     * the admin-store mapping lives in AdminContext and fails closed for storefront areas.
      *
      * @return void
      * @throws LocalizedException
@@ -558,13 +565,7 @@ class Tag extends AbstractModel implements IdentityInterface
         if ($this->_registry->registry('isSecureArea')) {
             return;
         }
-        try {
-            $areaCode = $this->_appState->getAreaCode();
-        } catch (LocalizedException $e) {
-            // Area not set (CLI / setup scripts): treated like M1 admin store scripts.
-            return;
-        }
-        if ($areaCode === Area::AREA_FRONTEND) {
+        if (!$this->adminContext->isAdminContext()) {
             throw new LocalizedException(__('Cannot complete this operation from non-admin area.'));
         }
     }

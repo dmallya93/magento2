@@ -7,17 +7,15 @@ declare(strict_types=1);
 
 namespace Magento\Tag\Model\ResourceModel;
 
-use Magento\Framework\App\Area;
-use Magento\Framework\App\State;
 use Magento\Framework\DataObject;
 use Magento\Framework\DB\Adapter\DuplicateException;
 use Magento\Framework\DB\Sql\Expression;
 use Magento\Framework\Exception\AlreadyExistsException;
-use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Model\AbstractModel;
 use Magento\Framework\Model\ResourceModel\Db\AbstractDb;
 use Magento\Framework\Model\ResourceModel\Db\Context;
 use Magento\Framework\Stdlib\StringUtils;
+use Magento\Tag\Model\AdminContext;
 use Magento\Tag\Model\OperationIdGenerator;
 use Magento\Tag\Model\Tag as TagModel;
 use Psr\Log\LoggerInterface;
@@ -42,9 +40,9 @@ class Tag extends AbstractDb
     private $string;
 
     /**
-     * @var State
+     * @var AdminContext
      */
-    private $appState;
+    private $adminContext;
 
     /**
      * @var LoggerInterface
@@ -66,7 +64,7 @@ class Tag extends AbstractDb
     /**
      * @param Context $context
      * @param StringUtils $string
-     * @param State $appState
+     * @param AdminContext $adminContext
      * @param LoggerInterface $logger
      * @param OperationIdGenerator $operationIdGenerator
      * @param string|null $connectionName
@@ -74,13 +72,13 @@ class Tag extends AbstractDb
     public function __construct(
         Context $context,
         StringUtils $string,
-        State $appState,
+        AdminContext $adminContext,
         LoggerInterface $logger,
         OperationIdGenerator $operationIdGenerator,
         $connectionName = null
     ) {
         $this->string = $string;
-        $this->appState = $appState;
+        $this->adminContext = $adminContext;
         $this->logger = $logger;
         $this->operationIdGenerator = $operationIdGenerator;
         parent::__construct($context, $connectionName);
@@ -261,7 +259,7 @@ class Tag extends AbstractDb
             $this->detectDuplicateNames($object);
         }
 
-        if (!$object->getData('store') || !$this->isAdminContext()) {
+        if (!$object->getData('store') || !$this->adminContext->isAdminContext()) {
             return parent::_afterSave($object);
         }
 
@@ -693,21 +691,6 @@ class Tag extends AbstractDb
         } catch (\Throwable $e) {
             // Diagnostic check only: must never change save behavior.
             return;
-        }
-    }
-
-    /**
-     * Admin context check (M1: Mage::app()->getStore()->isAdmin()). Everything except the storefront counts.
-     *
-     * @return bool
-     */
-    private function isAdminContext(): bool
-    {
-        try {
-            return $this->appState->getAreaCode() !== Area::AREA_FRONTEND;
-        } catch (LocalizedException $e) {
-            // Area not set (CLI/setup scripts) - M1 scripts typically ran in the admin store.
-            return true;
         }
     }
 

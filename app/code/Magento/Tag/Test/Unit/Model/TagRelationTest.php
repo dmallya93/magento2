@@ -13,6 +13,7 @@ use Magento\Framework\Registry;
 use Magento\Framework\Stdlib\DateTime\DateTime;
 use Magento\Framework\UrlInterface;
 use Magento\Store\Model\StoreManagerInterface;
+use Magento\Tag\Model\AdminContext;
 use Magento\Tag\Model\OperationIdGenerator;
 use Magento\Tag\Model\ResourceModel\Customer\CollectionFactory as CustomerCollectionFactory;
 use Magento\Tag\Model\ResourceModel\Popular\CollectionFactory as PopularCollectionFactory;
@@ -404,6 +405,7 @@ class TagRelationTest extends TestCase
             $this->createMock(DateTime::class),
             $this->createMock(LoggerInterface::class),
             $this->operationIdGeneratorMock,
+            $this->createMock(AdminContext::class),
             $tagResource,
             null,
             $data

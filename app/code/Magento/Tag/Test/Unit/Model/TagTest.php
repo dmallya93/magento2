@@ -12,6 +12,7 @@ use Magento\Framework\Registry;
 use Magento\Framework\Stdlib\DateTime\DateTime;
 use Magento\Framework\UrlInterface;
 use Magento\Store\Model\StoreManagerInterface;
+use Magento\Tag\Model\AdminContext;
 use Magento\Tag\Model\OperationIdGenerator;
 use Magento\Tag\Model\ResourceModel\Customer\CollectionFactory as CustomerCollectionFactory;
 use Magento\Tag\Model\ResourceModel\Popular\CollectionFactory as PopularCollectionFactory;
@@ -215,6 +216,7 @@ class TagTest extends TestCase
             $this->dateTimeMock,
             $this->loggerMock,
             $this->operationIdGeneratorMock,
+            $this->createMock(AdminContext::class),
             $this->tagResourceMock
         );
     }

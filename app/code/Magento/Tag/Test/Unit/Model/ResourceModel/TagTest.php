@@ -7,9 +7,7 @@ declare(strict_types=1);
 
 namespace Magento\Tag\Test\Unit\Model\ResourceModel;
 
-use Magento\Framework\App\Area;
 use Magento\Framework\App\ResourceConnection;
-use Magento\Framework\App\State;
 use Magento\Framework\DataObject;
 use Magento\Framework\DB\Adapter\AdapterInterface;
 use Magento\Framework\DB\Select;
@@ -20,6 +18,7 @@ use Magento\Framework\Stdlib\DateTime\DateTime;
 use Magento\Framework\Stdlib\StringUtils;
 use Magento\Framework\UrlInterface;
 use Magento\Store\Model\StoreManagerInterface;
+use Magento\Tag\Model\AdminContext;
 use Magento\Tag\Model\OperationIdGenerator;
 use Magento\Tag\Model\ResourceModel\Customer\CollectionFactory as CustomerCollectionFactory;
 use Magento\Tag\Model\ResourceModel\Popular\CollectionFactory as PopularCollectionFactory;
@@ -60,9 +59,9 @@ class TagTest extends TestCase
     private $selectMock;
 
     /**
-     * @var State|MockObject
+     * @var AdminContext|MockObject
      */
-    private $appStateMock;
+    private $adminContextMock;
 
     /**
      * @var LoggerInterface|MockObject
@@ -108,8 +107,8 @@ class TagTest extends TestCase
         $contextMock = $this->createMock(Context::class);
         $contextMock->method('getResources')->willReturn($resourceConnectionMock);
 
-        $this->appStateMock = $this->createMock(State::class);
-        $this->appStateMock->method('getAreaCode')->willReturn(Area::AREA_FRONTEND);
+        $this->adminContextMock = $this->createMock(AdminContext::class);
+        $this->adminContextMock->method('isAdminContext')->willReturn(false);
 
         $this->operationIdGeneratorMock = $this->createMock(OperationIdGenerator::class);
         $this->operationIdGeneratorMock->method('getOperationId')->willReturn(self::OPERATION_ID);
@@ -126,7 +125,7 @@ class TagTest extends TestCase
         $this->resource = new TagResource(
             $contextMock,
             new StringUtils(),
-            $this->appStateMock,
+            $this->adminContextMock,
             $this->loggerMock,
             $this->operationIdGeneratorMock
         );
@@ -511,6 +510,7 @@ class TagTest extends TestCase
             $this->createMock(DateTime::class),
             $this->createMock(LoggerInterface::class),
             $this->operationIdGeneratorMock,
+            $this->createMock(AdminContext::class),
             $this->resource,
             null,
             $data
