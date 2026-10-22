@@ -299,7 +299,7 @@ class Collection extends AbstractCollection
     public function addFieldToFilter($field, $condition = null)
     {
         if ($this->getFlag('relation') && $field == 'popularity') {
-            // TOFIX (inherited from M1)
+            // M1 parity: popularity filter is applied as HAVING on COUNT(relation.tag_relation_id), as in M1
             $this->getSelect()->having(
                 $this->_getConditionSql('COUNT(relation.tag_relation_id)', $condition)
             );

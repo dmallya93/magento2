@@ -340,7 +340,7 @@ class Collection extends \Magento\Customer\Model\ResourceModel\Customer\Collecti
         $tagRelationTable = $this->getTable('tag_relation');
         $tagTable = $this->getTable('tag');
 
-        //TODO: add full name logic (inherited from M1)
+        // M1 parity: only firstname/middlename/lastname are selected; no full-name concatenation (as in M1)
         $this->addAttributeToSelect('firstname')
             ->addAttributeToSelect('middlename')
             ->addAttributeToSelect('lastname')
