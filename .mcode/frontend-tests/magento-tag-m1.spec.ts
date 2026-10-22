@@ -1,7 +1,7 @@
 import { test, expect, Page } from "@playwright/test";
 
 const ADMIN_USER = process.env.ADMIN_USER || "admin";
-const ADMIN_PASS = process.env.ADMIN_PASS || "admin12345";
+const ADMIN_PASS = process.env.ADMIN_PASSWORD ?? process.env.ADMIN_PASS ?? "";
 
 function trackErrors(page: Page) {
   const errs: string[] = [];

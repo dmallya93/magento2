@@ -25,7 +25,7 @@ DB = dict(
     host=os.environ.get("DB_HOST", "127.0.0.1"),
     port=int(os.environ.get("DB_PORT", "3306")),
     user=os.environ.get("DB_USER", "magento"),
-    password=os.environ.get("DB_PASSWORD", "magento123"),
+    password=os.environ["DB_PASSWORD"],
     database=os.environ.get("DB_NAME", "magento"),
 )
 BASE_URL = f"http://127.0.0.1:{os.environ.get('MAGENTO_PORT', '8082')}/"
