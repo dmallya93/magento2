@@ -544,6 +544,16 @@ class Collection extends \Magento\Catalog\Model\ResourceModel\Product\Collection
     }
 
     /**
+     * Keep the per-row store_id selected by _joinFields() (M1 parity); do not overwrite with collection store
+     *
+     * @return $this
+     */
+    protected function prepareStoreId()
+    {
+        return $this;
+    }
+
+    /**
      * After load: add store visibility and dispatch tag_tag_product_collection_load_after
      *
      * @return $this
