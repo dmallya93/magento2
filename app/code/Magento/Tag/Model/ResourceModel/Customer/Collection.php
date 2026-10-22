@@ -10,7 +10,7 @@ namespace Magento\Tag\Model\ResourceModel\Customer;
 use Magento\Catalog\Model\Product;
 use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory as ProductCollectionFactory;
 use Magento\Framework\DB\Select;
-use Magento\Tag\Model\Logging\Context as LogContext;
+use Magento\Tag\Model\ResourceModel\CollectionLoadLoggerTrait;
 use Magento\Tag\Model\OperationIdGenerator;
 
 /**
@@ -23,6 +23,8 @@ use Magento\Tag\Model\OperationIdGenerator;
  */
 class Collection extends \Magento\Customer\Model\ResourceModel\Customer\Collection
 {
+    use CollectionLoadLoggerTrait;
+
     /**
      * Allows disabling grouping
      *
@@ -155,16 +157,9 @@ class Collection extends \Magento\Customer\Model\ResourceModel\Customer\Collecti
             return $this;
         }
 
-        $startedAt = microtime(true);
-        try {
+        return $this->runLoggedLoad(function () use ($printQuery, $logQuery) {
             parent::load($printQuery, $logQuery);
-        } catch (\Throwable $e) {
-            $this->logCollectionLoad($startedAt, $e);
-            throw $e;
-        }
-        $this->logCollectionLoad($startedAt);
-
-        return $this;
+        });
     }
 
     /**
@@ -514,35 +509,4 @@ class Collection extends \Magento\Customer\Model\ResourceModel\Customer\Collecti
         return $this;
     }
 
-    /**
-     * Emit the DEBUG "collection.load" entry (or ERROR on failure)
-     *
-     * @param float $startedAt
-     * @param \Throwable|null $exception
-     * @return void
-     */
-    private function logCollectionLoad(float $startedAt, ?\Throwable $exception = null): void
-    {
-        $context = [
-            'module' => LogContext::MODULE,
-            'operation' => 'collection.load',
-            'operation_id' => $this->operationIdGenerator->getOperationId(),
-            'collection_class' => static::class,
-            'filter_count' => count((array)$this->getSelect()->getPart(Select::WHERE))
-                + count((array)$this->getSelect()->getPart(Select::HAVING)),
-            'duration_ms' => LogContext::durationMs($startedAt),
-        ];
-
-        if ($exception !== null) {
-            $context['outcome'] = 'failure';
-            $context['error_code'] = 'collection.load.query_error';
-            $context['exception'] = $exception->getMessage();
-            $this->_logger->error('Tag collection load failed', $context);
-            return;
-        }
-
-        $context['outcome'] = 'success';
-        $context['result_count'] = count($this->_items);
-        $this->_logger->debug('Tag collection loaded', $context);
-    }
 }
