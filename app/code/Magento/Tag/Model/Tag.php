@@ -10,9 +10,7 @@ namespace Magento\Tag\Model;
 use Magento\Catalog\Model\Product;
 use Magento\Framework\Data\Collection\AbstractDb;
 use Magento\Framework\DataObject\IdentityInterface;
-use Magento\Framework\DB\Adapter\DuplicateException;
 use Magento\Framework\Event\Observer;
-use Magento\Framework\Exception\AlreadyExistsException;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Model\AbstractModel;
 use Magento\Framework\Model\Context;
@@ -21,6 +19,7 @@ use Magento\Framework\Registry;
 use Magento\Framework\Stdlib\DateTime\DateTime;
 use Magento\Framework\UrlInterface;
 use Magento\Store\Model\StoreManagerInterface;
+use Magento\Tag\Model\Logging\ErrorCodeResolver;
 use Magento\Tag\Model\ResourceModel\Customer\Collection as CustomerCollection;
 use Magento\Tag\Model\ResourceModel\Customer\CollectionFactory as CustomerCollectionFactory;
 use Magento\Tag\Model\ResourceModel\Popular\Collection as PopularCollection;
@@ -729,7 +728,7 @@ class Tag extends AbstractModel implements IdentityInterface
                 [
                     'operation' => 'relation.save',
                     'outcome' => 'failure',
-                    'error_code' => $this->resolveRelationErrorCode($e),
+                    'error_code' => ErrorCodeResolver::resolve($e, 'relation.save'),
                     'decision_path' => $decisionPath,
                     'exception' => $e->getMessage(),
                     'duration_ms' => $this->getDurationMs($startTime),
@@ -827,29 +826,6 @@ class Tag extends AbstractModel implements IdentityInterface
         }
 
         return parent::afterSave();
-    }
-
-    /**
-     * Map a persistence exception to a relation.save error_code
-     *
-     * @param \Throwable $exception
-     * @return string
-     */
-    private function resolveRelationErrorCode(\Throwable $exception): string
-    {
-        for ($e = $exception; $e !== null; $e = $e->getPrevious()) {
-            if ($e instanceof DuplicateException || $e instanceof AlreadyExistsException) {
-                return 'relation.save.duplicate';
-            }
-            $message = (string)$e->getMessage();
-            if (stripos($message, 'foreign key constraint') !== false || preg_match('/\b145[12]\b/', $message)) {
-                return 'relation.save.fk_violation';
-            }
-            if (stripos($message, 'Duplicate entry') !== false || preg_match('/\b1062\b/', $message)) {
-                return 'relation.save.duplicate';
-            }
-        }
-        return 'relation.save.failed';
     }
 
     /**

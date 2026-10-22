@@ -14,6 +14,7 @@ use Magento\Framework\Model\AbstractModel;
 use Magento\Framework\Model\Context;
 use Magento\Framework\Model\ResourceModel\AbstractResource;
 use Magento\Framework\Registry;
+use Magento\Tag\Model\Logging\ErrorCodeResolver;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -274,7 +275,7 @@ class TagRelation extends AbstractModel implements IdentityInterface
                 'Tag relation batch save failed',
                 $context + [
                     'outcome' => 'failure',
-                    'error_code' => $this->resolveErrorCode($e),
+                    'error_code' => ErrorCodeResolver::resolve($e, 'relation.save'),
                     'exception' => $e->getMessage(),
                     'duration_ms' => $this->getDurationMs($startTime),
                 ]
@@ -291,31 +292,6 @@ class TagRelation extends AbstractModel implements IdentityInterface
             ]
         );
         return $this;
-    }
-
-    /**
-     * Map a persistence exception to a relation.save error_code
-     *
-     * @param \Throwable $exception
-     * @return string
-     */
-    private function resolveErrorCode(\Throwable $exception): string
-    {
-        for ($e = $exception; $e !== null; $e = $e->getPrevious()) {
-            if ($e instanceof \Magento\Framework\DB\Adapter\DuplicateException
-                || $e instanceof \Magento\Framework\Exception\AlreadyExistsException
-            ) {
-                return 'relation.save.duplicate';
-            }
-            $message = (string)$e->getMessage();
-            if (stripos($message, 'foreign key constraint') !== false || preg_match('/\b145[12]\b/', $message)) {
-                return 'relation.save.fk_violation';
-            }
-            if (stripos($message, 'Duplicate entry') !== false || preg_match('/\b1062\b/', $message)) {
-                return 'relation.save.duplicate';
-            }
-        }
-        return 'relation.save.failed';
     }
 
     /**

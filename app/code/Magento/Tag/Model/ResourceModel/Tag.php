@@ -8,7 +8,6 @@ declare(strict_types=1);
 namespace Magento\Tag\Model\ResourceModel;
 
 use Magento\Framework\DataObject;
-use Magento\Framework\DB\Adapter\DuplicateException;
 use Magento\Framework\DB\Sql\Expression;
 use Magento\Framework\Exception\AlreadyExistsException;
 use Magento\Framework\Model\AbstractModel;
@@ -16,6 +15,7 @@ use Magento\Framework\Model\ResourceModel\Db\AbstractDb;
 use Magento\Framework\Model\ResourceModel\Db\Context;
 use Magento\Framework\Stdlib\StringUtils;
 use Magento\Tag\Model\AdminContext;
+use Magento\Tag\Model\Logging\ErrorCodeResolver;
 use Magento\Tag\Model\OperationIdGenerator;
 use Magento\Tag\Model\Tag as TagModel;
 use Psr\Log\LoggerInterface;
@@ -139,7 +139,7 @@ class Tag extends AbstractDb
                 'Tag save failed',
                 array_merge($context, [
                     'outcome' => 'failure',
-                    'error_code' => $this->resolveSaveErrorCode($e),
+                    'error_code' => ErrorCodeResolver::resolve($e, 'tag.save', 'unique_violation'),
                     'tag_id' => $object->getId(),
                     'tag_name' => $object->getData('name'),
                     'exception' => $e->getMessage(),
@@ -692,29 +692,6 @@ class Tag extends AbstractDb
             // Diagnostic check only: must never change save behavior.
             return;
         }
-    }
-
-    /**
-     * Map a save exception to a tag.save error_code
-     *
-     * @param \Throwable $exception
-     * @return string
-     */
-    private function resolveSaveErrorCode(\Throwable $exception): string
-    {
-        for ($e = $exception; $e !== null; $e = $e->getPrevious()) {
-            if ($e instanceof AlreadyExistsException || $e instanceof DuplicateException) {
-                return 'tag.save.unique_violation';
-            }
-            $message = (string)$e->getMessage();
-            if (stripos($message, 'foreign key constraint') !== false || preg_match('/\b145[12]\b/', $message)) {
-                return 'tag.save.fk_violation';
-            }
-            if (stripos($message, 'Duplicate entry') !== false || preg_match('/\b1062\b/', $message)) {
-                return 'tag.save.unique_violation';
-            }
-        }
-        return 'tag.save.failed';
     }
 
     /**
