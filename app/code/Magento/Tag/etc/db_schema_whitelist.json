@@ -1,0 +1,77 @@
+{
+    "tag": {
+        "column": {
+            "tag_id": true,
+            "name": true,
+            "status": true,
+            "first_customer_id": true,
+            "first_store_id": true
+        },
+        "constraint": {
+            "PRIMARY": true,
+            "TAG_FIRST_CUSTOMER_ID_CUSTOMER_ENTITY_ENTITY_ID": true,
+            "TAG_FIRST_STORE_ID_STORE_STORE_ID": true
+        }
+    },
+    "tag_relation": {
+        "column": {
+            "tag_relation_id": true,
+            "tag_id": true,
+            "customer_id": true,
+            "product_id": true,
+            "store_id": true,
+            "active": true,
+            "created_at": true
+        },
+        "index": {
+            "TAG_RELATION_PRODUCT_ID": true,
+            "TAG_RELATION_TAG_ID": true,
+            "TAG_RELATION_CUSTOMER_ID": true,
+            "TAG_RELATION_STORE_ID": true
+        },
+        "constraint": {
+            "PRIMARY": true,
+            "TAG_RELATION_TAG_ID_CUSTOMER_ID_PRODUCT_ID_STORE_ID": true,
+            "TAG_RELATION_CUSTOMER_ID_CUSTOMER_ENTITY_ENTITY_ID": true,
+            "TAG_RELATION_PRODUCT_ID_CATALOG_PRODUCT_ENTITY_ENTITY_ID": true,
+            "TAG_RELATION_STORE_ID_STORE_STORE_ID": true,
+            "TAG_RELATION_TAG_ID_TAG_TAG_ID": true
+        }
+    },
+    "tag_summary": {
+        "column": {
+            "tag_id": true,
+            "store_id": true,
+            "customers": true,
+            "products": true,
+            "uses": true,
+            "historical_uses": true,
+            "popularity": true,
+            "base_popularity": true
+        },
+        "index": {
+            "TAG_SUMMARY_STORE_ID": true,
+            "TAG_SUMMARY_TAG_ID": true
+        },
+        "constraint": {
+            "PRIMARY": true,
+            "TAG_SUMMARY_STORE_ID_STORE_STORE_ID": true,
+            "TAG_SUMMARY_TAG_ID_TAG_TAG_ID": true
+        }
+    },
+    "tag_properties": {
+        "column": {
+            "tag_id": true,
+            "store_id": true,
+            "base_popularity": true
+        },
+        "index": {
+            "TAG_PROPERTIES_STORE_ID": true
+        },
+        "constraint": {
+            "PRIMARY": true,
+            "TAG_PROPERTIES_STORE_ID_STORE_STORE_ID": true,
+            "TAG_PROPERTIES_TAG_ID_TAG_TAG_ID": true
+        }
+    }
+}
