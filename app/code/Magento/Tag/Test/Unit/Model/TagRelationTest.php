@@ -25,6 +25,7 @@ use Magento\Tag\Model\TagRelation;
 use Magento\Tag\Model\TagRelationFactory;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -325,6 +326,33 @@ class TagRelationTest extends TestCase
             );
 
         $this->model->addRelations($tag);
+    }
+
+    /**
+     * Non-array product ids are rejected before anything is touched (no silent "replace with empty set")
+     *
+     * @param mixed $productIds
+     * @return void
+     */
+    #[DataProvider('invalidProductIdsProvider')]
+    public function testAddRelationsRejectsNonArrayProductIds($productIds): void
+    {
+        $tag = $this->createTag(['tag_id' => 10, 'store' => 1]);
+        $this->resourceMock->expects($this->never())->method('addRelations');
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->model->addRelations($tag, $productIds);
+    }
+
+    /**
+     * @return array
+     */
+    public static function invalidProductIdsProvider(): array
+    {
+        return [
+            'null' => [null],
+            'scalar' => ['5'],
+        ];
     }
 
     /**

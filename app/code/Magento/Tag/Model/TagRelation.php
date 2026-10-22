@@ -244,12 +244,15 @@ class TagRelation extends AbstractModel implements IdentityInterface
      * @param Tag $model
      * @param array $productIds
      * @return $this
+     * @throws \InvalidArgumentException when $productIds is not an array (M1 never coerced it)
      * @throws \Exception
      */
     public function addRelations(Tag $model, $productIds = [])
     {
         $startTime = microtime(true);
-        $productIds = is_array($productIds) ? $productIds : (array)$productIds;
+        if (!is_array($productIds)) {
+            throw new \InvalidArgumentException('Tag relation product ids must be an array.');
+        }
         $this->setAddedProductIds($productIds);
         $this->setTagId($model->getTagId());
         $this->setCustomerId(null);

@@ -244,10 +244,14 @@ class Relation extends AbstractDb
      *
      * @param TagRelation $model
      * @return $this
+     * @throws \InvalidArgumentException when the added product ids are not an array (M1 never coerced them)
      */
     public function addRelations($model)
     {
-        $addedIds = (array)$model->getAddedProductIds();
+        $addedIds = $model->getAddedProductIds();
+        if (!is_array($addedIds)) {
+            throw new \InvalidArgumentException('Tag relation product ids must be an array.');
+        }
 
         $bind = [
             'tag_id' => $model->getTagId(),
