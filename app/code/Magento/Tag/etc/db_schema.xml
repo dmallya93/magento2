@@ -1,0 +1,127 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Copyright 2026 Adobe
+ * All Rights Reserved.
+ */
+-->
+<schema xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:Setup/Declaration/Schema/etc/schema.xsd">
+    <table name="tag" resource="default" engine="innodb" comment="Tag">
+        <column xsi:type="int" name="tag_id" unsigned="true" nullable="false" identity="true"
+                comment="Tag Id"/>
+        <column xsi:type="varchar" name="name" nullable="true" length="255" comment="Name"/>
+        <column xsi:type="smallint" name="status" unsigned="false" nullable="false" identity="false"
+                default="0" comment="Status"/>
+        <column xsi:type="int" name="first_customer_id" unsigned="true" nullable="true" identity="false"
+                comment="First Customer Id"/>
+        <column xsi:type="smallint" name="first_store_id" unsigned="true" nullable="true" identity="false"
+                comment="First Store Id"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="tag_id"/>
+        </constraint>
+        <constraint xsi:type="foreign" referenceId="TAG_FIRST_CUSTOMER_ID_CUSTOMER_ENTITY_ENTITY_ID" table="tag"
+                    column="first_customer_id" referenceTable="customer_entity" referenceColumn="entity_id"
+                    onDelete="SET NULL"/>
+        <constraint xsi:type="foreign" referenceId="TAG_FIRST_STORE_ID_STORE_STORE_ID" table="tag"
+                    column="first_store_id" referenceTable="store" referenceColumn="store_id"
+                    onDelete="SET NULL"/>
+    </table>
+    <table name="tag_relation" resource="default" engine="innodb" comment="Tag Relation">
+        <column xsi:type="int" name="tag_relation_id" unsigned="true" nullable="false" identity="true"
+                comment="Tag Relation Id"/>
+        <column xsi:type="int" name="tag_id" unsigned="true" nullable="false" identity="false"
+                default="0" comment="Tag Id"/>
+        <column xsi:type="int" name="customer_id" unsigned="true" nullable="true" identity="false"
+                comment="Customer Id"/>
+        <column xsi:type="int" name="product_id" unsigned="true" nullable="false" identity="false"
+                default="0" comment="Product Id"/>
+        <column xsi:type="smallint" name="store_id" unsigned="true" nullable="false" identity="false"
+                default="1" comment="Store Id"/>
+        <column xsi:type="smallint" name="active" unsigned="true" nullable="false" identity="false"
+                default="1" comment="Active"/>
+        <column xsi:type="timestamp" name="created_at" on_update="false" nullable="true" comment="Created At"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="tag_relation_id"/>
+        </constraint>
+        <constraint xsi:type="unique" referenceId="TAG_RELATION_TAG_ID_CUSTOMER_ID_PRODUCT_ID_STORE_ID">
+            <column name="tag_id"/>
+            <column name="customer_id"/>
+            <column name="product_id"/>
+            <column name="store_id"/>
+        </constraint>
+        <constraint xsi:type="foreign" referenceId="TAG_RELATION_CUSTOMER_ID_CUSTOMER_ENTITY_ENTITY_ID"
+                    table="tag_relation" column="customer_id" referenceTable="customer_entity"
+                    referenceColumn="entity_id" onDelete="CASCADE"/>
+        <constraint xsi:type="foreign" referenceId="TAG_RELATION_PRODUCT_ID_CATALOG_PRODUCT_ENTITY_ENTITY_ID"
+                    table="tag_relation" column="product_id" referenceTable="catalog_product_entity"
+                    referenceColumn="entity_id" onDelete="CASCADE"/>
+        <constraint xsi:type="foreign" referenceId="TAG_RELATION_STORE_ID_STORE_STORE_ID" table="tag_relation"
+                    column="store_id" referenceTable="store" referenceColumn="store_id" onDelete="CASCADE"/>
+        <constraint xsi:type="foreign" referenceId="TAG_RELATION_TAG_ID_TAG_TAG_ID" table="tag_relation"
+                    column="tag_id" referenceTable="tag" referenceColumn="tag_id" onDelete="CASCADE"/>
+        <index referenceId="TAG_RELATION_PRODUCT_ID" indexType="btree">
+            <column name="product_id"/>
+        </index>
+        <index referenceId="TAG_RELATION_TAG_ID" indexType="btree">
+            <column name="tag_id"/>
+        </index>
+        <index referenceId="TAG_RELATION_CUSTOMER_ID" indexType="btree">
+            <column name="customer_id"/>
+        </index>
+        <index referenceId="TAG_RELATION_STORE_ID" indexType="btree">
+            <column name="store_id"/>
+        </index>
+    </table>
+    <table name="tag_summary" resource="default" engine="innodb" comment="Tag Summary">
+        <column xsi:type="int" name="tag_id" unsigned="true" nullable="false" identity="false"
+                default="0" comment="Tag Id"/>
+        <column xsi:type="smallint" name="store_id" unsigned="true" nullable="false" identity="false"
+                default="0" comment="Store Id"/>
+        <column xsi:type="int" name="customers" unsigned="true" nullable="false" identity="false"
+                default="0" comment="Customers"/>
+        <column xsi:type="int" name="products" unsigned="true" nullable="false" identity="false"
+                default="0" comment="Products"/>
+        <column xsi:type="int" name="uses" unsigned="true" nullable="false" identity="false"
+                default="0" comment="Uses"/>
+        <column xsi:type="int" name="historical_uses" unsigned="true" nullable="false" identity="false"
+                default="0" comment="Historical Uses"/>
+        <column xsi:type="int" name="popularity" unsigned="true" nullable="false" identity="false"
+                default="0" comment="Popularity"/>
+        <column xsi:type="int" name="base_popularity" unsigned="true" nullable="false" identity="false"
+                default="0" comment="Base Popularity"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="tag_id"/>
+            <column name="store_id"/>
+        </constraint>
+        <constraint xsi:type="foreign" referenceId="TAG_SUMMARY_STORE_ID_STORE_STORE_ID" table="tag_summary"
+                    column="store_id" referenceTable="store" referenceColumn="store_id" onDelete="CASCADE"/>
+        <constraint xsi:type="foreign" referenceId="TAG_SUMMARY_TAG_ID_TAG_TAG_ID" table="tag_summary"
+                    column="tag_id" referenceTable="tag" referenceColumn="tag_id" onDelete="CASCADE"/>
+        <index referenceId="TAG_SUMMARY_STORE_ID" indexType="btree">
+            <column name="store_id"/>
+        </index>
+        <index referenceId="TAG_SUMMARY_TAG_ID" indexType="btree">
+            <column name="tag_id"/>
+        </index>
+    </table>
+    <table name="tag_properties" resource="default" engine="innodb" comment="Tag Properties">
+        <column xsi:type="int" name="tag_id" unsigned="true" nullable="false" identity="false"
+                default="0" comment="Tag Id"/>
+        <column xsi:type="smallint" name="store_id" unsigned="true" nullable="false" identity="false"
+                default="0" comment="Store Id"/>
+        <column xsi:type="int" name="base_popularity" unsigned="true" nullable="false" identity="false"
+                default="0" comment="Base Popularity"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="tag_id"/>
+            <column name="store_id"/>
+        </constraint>
+        <constraint xsi:type="foreign" referenceId="TAG_PROPERTIES_STORE_ID_STORE_STORE_ID" table="tag_properties"
+                    column="store_id" referenceTable="store" referenceColumn="store_id" onDelete="CASCADE"/>
+        <constraint xsi:type="foreign" referenceId="TAG_PROPERTIES_TAG_ID_TAG_TAG_ID" table="tag_properties"
+                    column="tag_id" referenceTable="tag" referenceColumn="tag_id" onDelete="CASCADE"/>
+        <index referenceId="TAG_PROPERTIES_STORE_ID" indexType="btree">
+            <column name="store_id"/>
+        </index>
+    </table>
+</schema>

@@ -1,0 +1,63 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Copyright 2026 Adobe
+ * All Rights Reserved.
+ */
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+    <!-- Dedicated "tag" log channel writing to var/log/tag.log -->
+    <virtualType name="MagentoTagLogHandler" type="Magento\Framework\Logger\Handler\Base">
+        <arguments>
+            <argument name="fileName" xsi:type="string">/var/log/tag.log</argument>
+        </arguments>
+    </virtualType>
+    <virtualType name="MagentoTagLogger" type="Magento\Framework\Logger\Monolog">
+        <arguments>
+            <argument name="name" xsi:type="string">tag</argument>
+            <argument name="handlers" xsi:type="array">
+                <item name="tag" xsi:type="object">MagentoTagLogHandler</item>
+            </argument>
+        </arguments>
+    </virtualType>
+    <type name="Magento\Tag\Model\Tag">
+        <arguments>
+            <argument name="logger" xsi:type="object">MagentoTagLogger</argument>
+        </arguments>
+    </type>
+    <type name="Magento\Tag\Model\TagRelation">
+        <arguments>
+            <argument name="logger" xsi:type="object">MagentoTagLogger</argument>
+        </arguments>
+    </type>
+    <type name="Magento\Tag\Model\ResourceModel\Tag">
+        <arguments>
+            <argument name="logger" xsi:type="object">MagentoTagLogger</argument>
+        </arguments>
+    </type>
+    <type name="Magento\Tag\Helper\Data">
+        <arguments>
+            <argument name="logger" xsi:type="object">MagentoTagLogger</argument>
+        </arguments>
+    </type>
+    <type name="Magento\Tag\Model\ResourceModel\Tag\Collection">
+        <arguments>
+            <argument name="logger" xsi:type="object">MagentoTagLogger</argument>
+        </arguments>
+    </type>
+    <type name="Magento\Tag\Model\ResourceModel\Popular\Collection">
+        <arguments>
+            <argument name="logger" xsi:type="object">MagentoTagLogger</argument>
+        </arguments>
+    </type>
+    <type name="Magento\Tag\Model\ResourceModel\Product\Collection">
+        <arguments>
+            <argument name="logger" xsi:type="object">MagentoTagLogger</argument>
+        </arguments>
+    </type>
+    <type name="Magento\Tag\Model\ResourceModel\Customer\Collection">
+        <arguments>
+            <argument name="logger" xsi:type="object">MagentoTagLogger</argument>
+        </arguments>
+    </type>
+</config>
