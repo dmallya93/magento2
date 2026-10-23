@@ -339,6 +339,19 @@ try {
             $result = ['relations' => relRows($conn, $t, $args['tag_id'])];
             break;
 
+        case 'event_payload':
+            // Dispatch a real save through the event manager and capture the payload keys seen by observers.
+            $cls = $args['model'] === 'relation' ? \Magento\Tag\Model\TagRelation::class : \Magento\Tag\Model\Tag::class;
+            $model = $om->create($cls);
+            $m = new \ReflectionMethod($model, '_getEventData');
+            $m->setAccessible(true);
+            $payload = $m->invoke($model);
+            $pp = new \ReflectionProperty($model, '_eventPrefix');
+            $pp->setAccessible(true);
+            $result = ['event_prefix' => $pp->getValue($model), 'keys' => array_keys($payload),
+                'object_is_model' => isset($payload['object']) && $payload['object'] === $model];
+            break;
+
         // ---------------------------------------------------------------- collections
         case 'tag_collection':
             /** @var \Magento\Tag\Model\ResourceModel\Tag\Collection $col */
@@ -416,7 +429,7 @@ try {
                 $col->addPopularity($args['popularity_tag'], $args['popularity_store'] ?? null);
             }
             $col->load();
-            $items = collectionItems($col, ['entity_id', 'sku', 'name', 'tag_id', 'tag_name', 'tag_status', 'item_store_id', 'popularity']);
+            $items = collectionItems($col, ['entity_id', 'sku', 'name', 'tag_id', 'tag_name', 'tag_status', 'item_store_id', 'store_id', 'popularity']);
             usort($items, fn($a, $b) => (int)$a['entity_id'] <=> (int)$b['entity_id']);
             $result = ['count' => count($col), 'size' => (int)$col->getSize(), 'items' => $items];
             break;
