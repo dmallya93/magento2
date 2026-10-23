@@ -207,13 +207,9 @@ class TagRelation extends AbstractModel implements IdentityInterface
             'tag_id' => $this->getTagId(),
             'customer_id' => $this->getCustomerId(),
         ];
-        $beforeActive = $this->getData('active');
-        $this->logger->info(
-            'Tag relation deactivation started',
-            LogContext::merge($context, ['before_active' => $beforeActive === null ? null : (int)$beforeActive])
-        );
+        $this->logger->info('Tag relation deactivation started', $context);
         try {
-            $this->_getResource()->deactivate($this->getTagId(), $this->getCustomerId());
+            $result = $this->_getResource()->deactivateRelations($this->getTagId(), $this->getCustomerId());
         } catch (\Throwable $e) {
             $this->logger->error(
                 'Tag relation deactivation failed',
@@ -226,11 +222,25 @@ class TagRelation extends AbstractModel implements IdentityInterface
             );
             throw $e;
         }
+        if (empty($result['before_active'])) {
+            $this->logger->warning(
+                'No tag relation found to deactivate',
+                LogContext::merge($context, [
+                    'outcome' => 'skipped',
+                    'error_code' => 'relation.deactivate.not_found',
+                    'affected_count' => 0,
+                    'duration_ms' => LogContext::durationMs($startTime),
+                ])
+            );
+            return $this;
+        }
         $this->logger->info(
             'Tag relation deactivation completed',
             LogContext::merge($context, [
                 'outcome' => 'success',
-                'before_active' => $beforeActive === null ? null : (int)$beforeActive,
+                'affected_count' => $result['affected_count'],
+                'relation_ids' => array_keys($result['before_active']),
+                'before_active' => $result['before_active'],
                 'after_active' => self::STATUS_NOT_ACTIVE,
                 'duration_ms' => LogContext::durationMs($startTime),
             ])

@@ -10,10 +10,7 @@ namespace Magento\Tag\Model\ResourceModel\Tag;
 use Magento\Framework\Model\ResourceModel\Db\AbstractDb;
 use Magento\Framework\Model\ResourceModel\Db\Context;
 use Magento\Framework\Stdlib\DateTime\DateTime;
-use Magento\Tag\Model\Logging\Context as LogContext;
-use Magento\Tag\Model\OperationIdGenerator;
 use Magento\Tag\Model\TagRelation;
-use Psr\Log\LoggerInterface;
 
 /**
  * Tag relation resource model (port of Mage_Tag_Model_Resource_Tag_Relation)
@@ -26,32 +23,16 @@ class Relation extends AbstractDb
     private $dateTime;
 
     /**
-     * @var LoggerInterface
-     */
-    private $logger;
-
-    /**
-     * @var OperationIdGenerator
-     */
-    private $operationIdGenerator;
-
-    /**
      * @param Context $context
      * @param DateTime $dateTime
-     * @param LoggerInterface $logger
-     * @param OperationIdGenerator $operationIdGenerator
      * @param string|null $connectionName
      */
     public function __construct(
         Context $context,
         DateTime $dateTime,
-        LoggerInterface $logger,
-        OperationIdGenerator $operationIdGenerator,
         $connectionName = null
     ) {
         $this->dateTime = $dateTime;
-        $this->logger = $logger;
-        $this->operationIdGenerator = $operationIdGenerator;
         parent::__construct($context, $connectionName);
     }
 
@@ -190,11 +171,24 @@ class Relation extends AbstractDb
     /**
      * Deactivate tag relations by tag and customer
      *
-     * @param int|string|null $tagId
-     * @param int|string|null $customerId
+     * @param int $tagId
+     * @param int $customerId
      * @return $this
      */
     public function deactivate($tagId, $customerId)
+    {
+        $this->deactivateRelations($tagId, $customerId);
+        return $this;
+    }
+
+    /**
+     * Deactivate tag relations by tag and customer and report what changed (no logging; the model logs)
+     *
+     * @param int $tagId
+     * @param int $customerId
+     * @return array ['before_active' => [tag_relation_id => active], 'affected_count' => int]
+     */
+    public function deactivateRelations($tagId, $customerId): array
     {
         $connection = $this->getConnection();
         $condition = [
@@ -212,30 +206,10 @@ class Relation extends AbstractDb
         $data = ['active' => TagRelation::STATUS_NOT_ACTIVE];
         $affected = $connection->update($this->getMainTable(), $data, $condition);
 
-        $context = [
-            'module' => LogContext::MODULE,
-            'operation' => 'relation.deactivate',
-            'operation_id' => $this->operationIdGenerator->getOperationId(),
-            'tag_id' => $tagId,
-            'customer_id' => $customerId,
+        return [
+            'before_active' => array_map('intval', (array)$beforeActive),
+            'affected_count' => (int)$affected,
         ];
-        if (empty($beforeActive)) {
-            $this->logger->warning(
-                'No tag relation found to deactivate',
-                LogContext::merge($context, ['outcome' => 'skipped', 'error_code' => 'relation.deactivate.not_found'])
-            );
-        } else {
-            $this->logger->info(
-                'Tag relations deactivated',
-                LogContext::merge($context, [
-                    'affected_count' => (int)$affected,
-                    'relation_ids' => array_keys($beforeActive),
-                    'before_active' => array_map('intval', $beforeActive),
-                    'after_active' => TagRelation::STATUS_NOT_ACTIVE,
-                ])
-            );
-        }
-        return $this;
     }
 
     /**

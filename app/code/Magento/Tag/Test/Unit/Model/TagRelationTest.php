@@ -210,7 +210,7 @@ class TagRelationTest extends TestCase
     }
 
     /**
-     * deactivate() delegates (tag id, customer id) to the resource model and logs start + completion
+     * deactivate() delegates (tag id, customer id) to the resource model and logs one start + completion pair
      *
      * @return void
      */
@@ -218,9 +218,9 @@ class TagRelationTest extends TestCase
     {
         $this->model->setTagId(10)->setCustomerId(5)->setActive(1);
         $this->resourceMock->expects($this->once())
-            ->method('deactivate')
+            ->method('deactivateRelations')
             ->with(10, 5)
-            ->willReturnSelf();
+            ->willReturn(['before_active' => [70 => 1, 71 => 0], 'affected_count' => 2]);
 
         $this->assertSame($this->model, $this->model->deactivate());
 
@@ -233,12 +233,35 @@ class TagRelationTest extends TestCase
             $this->assertSame(10, $entry[2]['tag_id']);
             $this->assertSame(5, $entry[2]['customer_id']);
         }
-        $this->assertSame(1, $entries[0][2]['before_active']);
+        $this->assertArrayNotHasKey('before_active', $entries[0][2]);
         $completion = $entries[1][2];
         $this->assertSame('success', $completion['outcome']);
-        $this->assertSame(1, $completion['before_active']);
+        $this->assertSame(2, $completion['affected_count']);
+        $this->assertSame([70, 71], $completion['relation_ids']);
+        $this->assertSame([70 => 1, 71 => 0], $completion['before_active']);
         $this->assertSame(TagRelation::STATUS_NOT_ACTIVE, $completion['after_active']);
         $this->assertArrayHasKey('duration_ms', $completion);
+    }
+
+    /**
+     * Nothing to deactivate: a single WARNING result with relation.deactivate.not_found and duration_ms
+     *
+     * @return void
+     */
+    public function testDeactivateNotFoundLogsWarning(): void
+    {
+        $this->model->setTagId(10)->setCustomerId(5);
+        $this->resourceMock->method('deactivateRelations')
+            ->willReturn(['before_active' => [], 'affected_count' => 0]);
+
+        $this->model->deactivate();
+
+        $entries = $this->logsByOperation('relation.deactivate');
+        $this->assertCount(2, $entries);
+        $this->assertSame('warning', $entries[1][0]);
+        $this->assertSame('skipped', $entries[1][2]['outcome']);
+        $this->assertSame('relation.deactivate.not_found', $entries[1][2]['error_code']);
+        $this->assertArrayHasKey('duration_ms', $entries[1][2]);
     }
 
     /**
@@ -249,7 +272,7 @@ class TagRelationTest extends TestCase
     public function testDeactivateFailureIsLoggedAndRethrown(): void
     {
         $this->model->setTagId(10)->setCustomerId(5);
-        $this->resourceMock->method('deactivate')->willThrowException(new \RuntimeException('connection lost'));
+        $this->resourceMock->method('deactivateRelations')->willThrowException(new \RuntimeException('connection lost'));
 
         try {
             $this->model->deactivate();

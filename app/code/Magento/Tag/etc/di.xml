@@ -35,11 +35,6 @@
             <argument name="logger" xsi:type="object">MagentoTagLogger</argument>
         </arguments>
     </type>
-    <type name="Magento\Tag\Model\ResourceModel\Tag\Relation">
-        <arguments>
-            <argument name="logger" xsi:type="object">MagentoTagLogger</argument>
-        </arguments>
-    </type>
     <type name="Magento\Tag\Helper\Data">
         <arguments>
             <argument name="logger" xsi:type="object">MagentoTagLogger</argument>
