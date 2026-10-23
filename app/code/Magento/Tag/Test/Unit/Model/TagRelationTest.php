@@ -210,6 +210,98 @@ class TagRelationTest extends TestCase
     }
 
     /**
+     * getRelatedTagIds() asks the resource model once and caches the result in `related_tag_ids`
+     *
+     * @return void
+     */
+    public function testGetRelatedTagIdsDelegatesOnceAndCaches(): void
+    {
+        $this->model->setProductId(100);
+        $this->resourceMock->expects($this->once())
+            ->method('getRelatedTagIds')
+            ->with($this->identicalTo($this->model))
+            ->willReturn(['3', '7']);
+
+        $this->assertSame(['3', '7'], $this->model->getRelatedTagIds());
+        $this->assertSame(['3', '7'], $this->model->getRelatedTagIds());
+        $this->assertSame(['3', '7'], $this->model->getData('related_tag_ids'));
+    }
+
+    /**
+     * An empty related tag id list is cached too (only NULL triggers the lookup)
+     *
+     * @return void
+     */
+    public function testGetRelatedTagIdsCachesEmptyResult(): void
+    {
+        $this->resourceMock->expects($this->once())->method('getRelatedTagIds')->willReturn([]);
+
+        $this->assertSame([], $this->model->getRelatedTagIds());
+        $this->assertSame([], $this->model->getRelatedTagIds());
+    }
+
+    /**
+     * Preset related tag ids are returned without querying
+     *
+     * @return void
+     */
+    public function testGetRelatedTagIdsReturnsPresetIds(): void
+    {
+        $this->model->setRelatedTagIds(['9']);
+        $this->resourceMock->expects($this->never())->method('getRelatedTagIds');
+
+        $this->assertSame(['9'], $this->model->getRelatedTagIds());
+    }
+
+    /**
+     * getIdentities(): relation cache tag, plus tag and (scalar) product cache tags when set
+     *
+     * @param array $data
+     * @param string[] $expected
+     * @return void
+     */
+    #[DataProvider('identitiesDataProvider')]
+    public function testGetIdentities(array $data, array $expected): void
+    {
+        $this->model->setData($data);
+
+        $this->assertSame($expected, $this->model->getIdentities());
+    }
+
+    /**
+     * @return array
+     */
+    public static function identitiesDataProvider(): array
+    {
+        return [
+            'relation only' => [
+                ['tag_relation_id' => 1],
+                ['tag_relation_1'],
+            ],
+            'relation, tag and product' => [
+                ['tag_relation_id' => 1, 'tag_id' => 10, 'product_id' => 100],
+                ['tag_relation_1', 'tag_10', 'cat_p_100'],
+            ],
+            'tag without product' => [
+                ['tag_relation_id' => 2, 'tag_id' => 10],
+                ['tag_relation_2', 'tag_10'],
+            ],
+            'product without tag' => [
+                ['tag_relation_id' => 2, 'product_id' => 100],
+                ['tag_relation_2', 'cat_p_100'],
+            ],
+            'array product id is ignored' => [
+                ['tag_relation_id' => 3, 'tag_id' => 10, 'product_id' => [100, 200]],
+                ['tag_relation_3', 'tag_10'],
+            ],
+            'new relation (no id)' => [
+                [],
+                ['tag_relation_'],
+            ],
+        ];
+    }
+
+    /**
      * deactivate() delegates (tag id, customer id) to the resource model and logs one start + completion pair
      *
      * @return void

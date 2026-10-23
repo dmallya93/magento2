@@ -7,6 +7,9 @@ declare(strict_types=1);
 
 namespace Magento\Tag\Test\Unit\Model;
 
+use Magento\Framework\DataObject;
+use Magento\Framework\Event;
+use Magento\Framework\Event\Observer;
 use Magento\Framework\Model\Context;
 use Magento\Framework\Registry;
 use Magento\Framework\Stdlib\DateTime\DateTime;
@@ -18,6 +21,7 @@ use Magento\Tag\Model\ResourceModel\Customer\CollectionFactory as CustomerCollec
 use Magento\Tag\Model\ResourceModel\Popular\CollectionFactory as PopularCollectionFactory;
 use Magento\Tag\Model\ResourceModel\Product\CollectionFactory as ProductCollectionFactory;
 use Magento\Tag\Model\ResourceModel\Tag as TagResource;
+use Magento\Tag\Model\ResourceModel\Tag\Collection as TagCollection;
 use Magento\Tag\Model\ResourceModel\Tag\CollectionFactory as TagCollectionFactory;
 use Magento\Tag\Model\ResourceModel\Tag\Relation as RelationResource;
 use Magento\Tag\Model\Tag;
@@ -80,6 +84,11 @@ class TagTest extends TestCase
     private $tagRelationFactoryMock;
 
     /**
+     * @var TagCollectionFactory|MockObject
+     */
+    private $tagCollectionFactoryMock;
+
+    /**
      * @var DateTime|MockObject
      */
     private $dateTimeMock;
@@ -112,6 +121,13 @@ class TagTest extends TestCase
      * @var bool
      */
     private bool $activeRelationCheckFails = false;
+
+    /**
+     * Ordered calls made on the product event tags collection
+     *
+     * @var string[]
+     */
+    private array $productEventCollectionCalls = [];
 
     /**
      * Snapshots of relation models passed to the relation resource save()
@@ -147,6 +163,7 @@ class TagTest extends TestCase
     protected function setUp(): void
     {
         $this->relationRows = [];
+        $this->productEventCollectionCalls = [];
         $this->savedRelations = [];
         $this->savedTags = [];
         $this->persistenceSequence = [];
@@ -210,11 +227,13 @@ class TagTest extends TestCase
             )
         );
 
+        $this->tagCollectionFactoryMock = $this->createPartialMock(TagCollectionFactory::class, ['create']);
+
         $this->tag = new Tag(
             $this->contextMock,
             $this->registryMock,
             $this->tagRelationFactoryMock,
-            $this->createPartialMock(TagCollectionFactory::class, ['create']),
+            $this->tagCollectionFactoryMock,
             $this->createPartialMock(ProductCollectionFactory::class, ['create']),
             $this->createPartialMock(CustomerCollectionFactory::class, ['create']),
             $this->createPartialMock(PopularCollectionFactory::class, ['create']),
@@ -326,6 +345,106 @@ class TagTest extends TestCase
             ->willReturnArgument(0);
 
         $this->assertSame($this->tag, $this->tag->aggregate());
+    }
+
+    /**
+     * getIdentities() without assigned products returns only the tag cache tag
+     *
+     * @return void
+     */
+    public function testGetIdentitiesWithoutAssignedProducts(): void
+    {
+        $this->tag->setData(['tag_id' => self::TAG_ID]);
+
+        $this->assertSame(['tag_10'], $this->tag->getIdentities());
+    }
+
+    /**
+     * getIdentities() adds one product cache tag per assigned product, de-duplicated and re-indexed
+     *
+     * @return void
+     */
+    public function testGetIdentitiesWithAssignedProductsIsDeduplicated(): void
+    {
+        $this->tag->setData(['tag_id' => self::TAG_ID, 'tag_assigned_products' => [1, 2, 2]]);
+
+        $this->assertSame(['tag_10', 'cat_p_1', 'cat_p_2'], $this->tag->getIdentities());
+    }
+
+    /**
+     * Non-array tag_assigned_products are ignored by getIdentities()
+     *
+     * @return void
+     */
+    public function testGetIdentitiesIgnoresNonArrayAssignedProducts(): void
+    {
+        $this->tag->setData(['tag_id' => self::TAG_ID, 'tag_assigned_products' => '1,2']);
+
+        $this->assertSame(['tag_10'], $this->tag->getIdentities());
+    }
+
+    /**
+     * productEventAggregate() aggregates every tag of the event product (M1 walk('aggregate'))
+     *
+     * @return void
+     */
+    public function testProductEventAggregateWalksAggregateOnProductTags(): void
+    {
+        $collection = $this->expectProductEventTagsCollection();
+        $collection->expects($this->once())->method('walk')->with('aggregate')->willReturn([]);
+        $collection->expects($this->never())->method('getAllIds');
+
+        $this->assertSame($this->tag, $this->tag->productEventAggregate($this->createProductObserver()));
+        $this->assertSame(
+            ['joinRel', 'addProductFilter', 'addTagGroup', 'load'],
+            $this->productEventCollectionCalls
+        );
+    }
+
+    /**
+     * productDeleteEventAction() decrements the product counters of every tag of the deleted product
+     *
+     * @return void
+     */
+    public function testProductDeleteEventActionDecrementsProductsOfProductTags(): void
+    {
+        $collection = $this->expectProductEventTagsCollection();
+        $collection->expects($this->once())->method('getAllIds')->willReturn([3, 4]);
+        $collection->expects($this->never())->method('walk');
+        $this->tagResourceMock->expects($this->once())
+            ->method('decrementProducts')
+            ->with([3, 4])
+            ->willReturn(2);
+
+        $this->assertSame($this->tag, $this->tag->productDeleteEventAction($this->createProductObserver()));
+        $this->assertSame(
+            ['joinRel', 'addProductFilter', 'addTagGroup', 'load'],
+            $this->productEventCollectionCalls
+        );
+    }
+
+    /**
+     * addSummary() sets the store id and delegates to the resource model
+     *
+     * @return void
+     */
+    public function testAddSummaryDelegatesToResource(): void
+    {
+        $this->tag->setData(['tag_id' => self::TAG_ID]);
+        $this->tagResourceMock->expects($this->once())
+            ->method('addSummary')
+            ->with($this->identicalTo($this->tag))
+            ->willReturnCallback(
+                function (Tag $model) {
+                    $this->assertSame(self::STORE_ID, $model->getStoreId());
+                    $model->addData(['customers' => 2, 'products' => 3, 'popularity' => 4]);
+                    return $model;
+                }
+            );
+
+        $this->assertSame($this->tag, $this->tag->addSummary(self::STORE_ID));
+        $this->assertSame(self::STORE_ID, $this->tag->getStoreId());
+        $this->assertSame(4, $this->tag->getPopularity());
     }
 
     /**
@@ -1026,6 +1145,48 @@ class TagTest extends TestCase
         $this->assertSame($result, $warnings[0][2]['saveRelation_result']);
         $this->assertSame(self::CUSTOMER_ID, $warnings[0][2]['customer_id']);
         $this->assertArrayHasKey('tag_id', $warnings[0][2]);
+    }
+
+    /**
+     * Expect one tag collection from the factory, built with joinRel()->addProductFilter()->addTagGroup()->load()
+     *
+     * @return TagCollection|MockObject
+     */
+    private function expectProductEventTagsCollection(): MockObject
+    {
+        $collection = $this->createMock(TagCollection::class);
+        $calls = &$this->productEventCollectionCalls;
+        foreach (['joinRel', 'addTagGroup', 'load'] as $method) {
+            $collection->expects($this->once())->method($method)->willReturnCallback(
+                function () use ($collection, $method, &$calls) {
+                    $calls[] = $method;
+                    return $collection;
+                }
+            );
+        }
+        $collection->expects($this->once())
+            ->method('addProductFilter')
+            ->with(self::PRODUCT_ID)
+            ->willReturnCallback(
+                function () use ($collection, &$calls) {
+                    $calls[] = 'addProductFilter';
+                    return $collection;
+                }
+            );
+        $this->tagCollectionFactoryMock->expects($this->once())->method('create')->willReturn($collection);
+
+        return $collection;
+    }
+
+    /**
+     * Observer carrying an event with the product
+     *
+     * @return Observer
+     */
+    private function createProductObserver(): Observer
+    {
+        $product = new DataObject(['id' => self::PRODUCT_ID]);
+        return new Observer(['event' => new Event(['product' => $product])]);
     }
 
     /**

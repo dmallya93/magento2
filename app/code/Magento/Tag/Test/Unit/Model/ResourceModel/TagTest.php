@@ -563,6 +563,87 @@ class TagTest extends TestCase
     }
 
     /**
+     * addSummary() reads the summary row of the tag in its store and merges it into the object
+     *
+     * @return void
+     */
+    public function testAddSummaryMergesFetchedRow(): void
+    {
+        $tag = $this->createTag(['tag_id' => '9', 'name' => 'summer', 'store_id' => '2']);
+        $this->selectMock->expects($this->once())
+            ->method('from')
+            ->with(['relation' => 'tag_relation'], [])
+            ->willReturnSelf();
+        $this->selectMock->expects($this->once())
+            ->method('joinLeft')
+            ->with(
+                ['summary' => 'tag_summary'],
+                'relation.tag_id = summary.tag_id AND relation.store_id = summary.store_id',
+                ['customers', 'products', 'popularity']
+            )
+            ->willReturnSelf();
+        $whereConditions = [];
+        $this->selectMock->expects($this->exactly(2))
+            ->method('where')
+            ->willReturnCallback(
+                function ($condition) use (&$whereConditions) {
+                    $whereConditions[] = $condition;
+                    return $this->selectMock;
+                }
+            );
+        $this->selectMock->expects($this->once())->method('limit')->with(1)->willReturnSelf();
+        $this->connectionMock->expects($this->once())
+            ->method('fetchRow')
+            ->with($this->selectMock, ['tag_id' => 9, 'store_id' => 2])
+            ->willReturn(['customers' => '4', 'products' => '5', 'popularity' => '6']);
+
+        $this->assertSame($tag, $this->resource->addSummary($tag));
+
+        $this->assertSame(['relation.tag_id = :tag_id', 'relation.store_id = :store_id'], $whereConditions);
+        $this->assertSame(
+            [
+                'tag_id' => '9',
+                'name' => 'summer',
+                'store_id' => '2',
+                'customers' => '4',
+                'products' => '5',
+                'popularity' => '6',
+            ],
+            $tag->getData()
+        );
+    }
+
+    /**
+     * addSummary() leaves the object unchanged when there is no summary row
+     *
+     * @param mixed $row
+     * @return void
+     */
+    #[DataProvider('emptySummaryRowDataProvider')]
+    public function testAddSummaryWithoutRowLeavesObjectUnchanged($row): void
+    {
+        $tag = $this->createTag(['tag_id' => 9, 'name' => 'summer']);
+        $this->connectionMock->expects($this->once())
+            ->method('fetchRow')
+            ->with($this->selectMock, ['tag_id' => 9, 'store_id' => 0])
+            ->willReturn($row);
+
+        $this->assertSame($tag, $this->resource->addSummary($tag));
+        $this->assertSame(['tag_id' => 9, 'name' => 'summer'], $tag->getData());
+    }
+
+    /**
+     * @return array
+     */
+    public static function emptySummaryRowDataProvider(): array
+    {
+        return [
+            'no row (false)' => [false],
+            'empty row' => [[]],
+        ];
+    }
+
+    /**
      * A failing summary rewrite is logged as tag.aggregate failure with an error_code and rethrown
      *
      * @return void
