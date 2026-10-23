@@ -703,6 +703,22 @@ class Tag extends AbstractModel implements IdentityInterface
                 );
             }
 
+            $noOpErrorCode = $this->resolveNoOpRelationErrorCode($decisionPath);
+            if ($noOpErrorCode !== null) {
+                $this->logger->warning(
+                    $noOpErrorCode === 'relation.save.duplicate'
+                        ? 'Duplicate tag relation attempt ignored'
+                        : 'Tag relation rejected: tag is disabled and customer already linked',
+                    LogContext::merge($context, [
+                        'operation' => 'relation.save',
+                        'error_code' => $noOpErrorCode,
+                        'saveRelation_result' => $result,
+                        'decision_path' => $decisionPath,
+                        'tag_status_before' => $statusBefore,
+                    ])
+                );
+            }
+
             if ($reopenTag) {
                 // The status lives on the tag row, so the flip back to PENDING applies in every store.
                 $this->setStatus($this->getPendingStatus())->save();
@@ -796,19 +812,50 @@ class Tag extends AbstractModel implements IdentityInterface
     }
 
     /**
+     * WARNING error_code for saveRelation() paths that change nothing (Project Spec section 14 "Duplicate/rejected")
+     *
+     * @param string|null $decisionPath
+     * @return string|null
+     */
+    private function resolveNoOpRelationErrorCode(?string $decisionPath): ?string
+    {
+        switch ($decisionPath) {
+            case self::DECISION_APPROVED_CUSTOMER_LINK_ACTIVE:
+            case self::DECISION_PENDING_CUSTOMER_LINK_ACTIVE:
+                return 'relation.save.duplicate';
+            case self::DECISION_DISABLED_CUSTOMER_ALREADY_LINKED:
+                return 'relation.save.rejected_disabled';
+            default:
+                return null;
+        }
+    }
+
+    /**
      * Read-only diagnostic: product counted as "already tagged" only because of inactive relations
      *
      * Used solely for the `inactive_links_counted` log field; it never changes the decision.
      *
      * @param TagRelation $relationModel
-     * @return bool
+     * @return bool|null null when the diagnostic check itself failed
      */
-    private function isProductTaggedOnlyByInactiveLinks(TagRelation $relationModel): bool
+    private function isProductTaggedOnlyByInactiveLinks(TagRelation $relationModel): ?bool
     {
         try {
             return !$relationModel->hasActiveProductRelation();
         } catch (\Throwable $e) {
-            return false;
+            $this->logger->warning(
+                'Inactive relation diagnostic check failed',
+                [
+                    'module' => LogContext::MODULE,
+                    'operation' => 'relation.inactive_links_check',
+                    'operation_id' => $this->operationIdGenerator->getOperationId(),
+                    'error_code' => 'relation.inactive_links_check_failed',
+                    'tag_id' => $this->getId(),
+                    'product_id' => $relationModel->getProductId(),
+                    'exception' => $e->getMessage(),
+                ]
+            );
+            return null;
         }
     }
 

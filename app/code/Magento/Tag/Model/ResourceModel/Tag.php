@@ -792,8 +792,18 @@ class Tag extends AbstractDb
                 );
             }
         } catch (\Throwable $e) {
-            // Diagnostic check only: must never change save behavior.
-            return;
+            // Diagnostic check only: must never change save behavior, but the failure must be observable.
+            $this->logger->warning(
+                'Duplicate tag name check failed',
+                [
+                    'module' => LogContext::MODULE,
+                    'operation' => 'tag.name.duplicate_check',
+                    'operation_id' => $this->operationIdGenerator->getOperationId(),
+                    'error_code' => 'tag.name.duplicate_check_failed',
+                    'tag_id' => $object->getId(),
+                    'exception' => $e->getMessage(),
+                ]
+            );
         }
     }
 

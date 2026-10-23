@@ -107,6 +107,13 @@ class TagTest extends TestCase
     private array $relationRows = [];
 
     /**
+     * When true, the fake hasActiveProductRelation() throws (diagnostic check failure)
+     *
+     * @var bool
+     */
+    private bool $activeRelationCheckFails = false;
+
+    /**
      * Snapshots of relation models passed to the relation resource save()
      *
      * @var array[]
@@ -347,6 +354,7 @@ class TagTest extends TestCase
             Tag::STATUS_APPROVED,
             false
         );
+        $this->assertNoOpWarning(null);
         $this->assertNoReopenWarning();
     }
 
@@ -428,6 +436,7 @@ class TagTest extends TestCase
             Tag::STATUS_APPROVED,
             false
         );
+        $this->assertNoOpWarning('relation.save.duplicate', Tag::ADD_STATUS_EXIST);
         $this->assertNoReopenWarning();
     }
 
@@ -535,6 +544,7 @@ class TagTest extends TestCase
             Tag::STATUS_PENDING,
             false
         );
+        $this->assertNoOpWarning('relation.save.duplicate', Tag::ADD_STATUS_NEW);
         $this->assertNoReopenWarning();
     }
 
@@ -564,6 +574,7 @@ class TagTest extends TestCase
             Tag::STATUS_DISABLED,
             false
         );
+        $this->assertNoOpWarning('relation.save.rejected_disabled', Tag::ADD_STATUS_REJECTED);
         $this->assertNoReopenWarning();
     }
 
@@ -631,6 +642,31 @@ class TagTest extends TestCase
             false
         );
         $this->assertReopenWarning();
+    }
+
+    /**
+     * A failing inactive-links diagnostic does not change the decision, logs a WARNING and reports null
+     *
+     * @return void
+     */
+    public function testInactiveLinksCheckFailureIsLoggedAndReportedAsUnknown(): void
+    {
+        $this->relationRows = [
+            $this->row(1, self::OTHER_CUSTOMER_ID, self::PRODUCT_ID, self::STORE_ID, 1),
+        ];
+        $this->activeRelationCheckFails = true;
+        $this->initTag(Tag::STATUS_APPROVED);
+
+        $this->assertSame(Tag::ADD_STATUS_EXIST, $this->saveRelation());
+
+        $this->assertRelationCreated();
+        $checks = $this->logsByOperation('relation.inactive_links_check');
+        $this->assertCount(1, $checks);
+        $this->assertSame('warning', $checks[0][0]);
+        $this->assertSame('relation.inactive_links_check_failed', $checks[0][2]['error_code']);
+        $decide = $this->logsByOperation('relation.decide');
+        $this->assertCount(1, $decide);
+        $this->assertNull($decide[0][2]['inactive_links_counted']);
     }
 
     /**
@@ -814,6 +850,9 @@ class TagTest extends TestCase
      */
     private function fakeHasActiveProductRelation(TagRelation $model): bool
     {
+        if ($this->activeRelationCheckFails) {
+            throw new \RuntimeException('Lost connection to MySQL server');
+        }
         foreach ($this->relationRows as $row) {
             if ($row['tag_id'] == $model->getTagId()
                 && $row['product_id'] == $model->getProductId()
@@ -963,6 +1002,30 @@ class TagTest extends TestCase
     private function assertNoReopenWarning(): void
     {
         $this->assertSame([], $this->logsByOperation('tag.status.auto_reopened'));
+    }
+
+    /**
+     * Assert the single section-14 "Duplicate/rejected tags" WARNING (or its absence when $errorCode is null)
+     *
+     * @param string|null $errorCode
+     * @param string|null $result
+     * @return void
+     */
+    private function assertNoOpWarning(?string $errorCode, ?string $result = null): void
+    {
+        $warnings = array_values(array_filter(
+            $this->logsByOperation('relation.save'),
+            fn (array $entry) => $entry[0] === 'warning'
+        ));
+        if ($errorCode === null) {
+            $this->assertSame([], $warnings);
+            return;
+        }
+        $this->assertCount(1, $warnings);
+        $this->assertSame($errorCode, $warnings[0][2]['error_code']);
+        $this->assertSame($result, $warnings[0][2]['saveRelation_result']);
+        $this->assertSame(self::CUSTOMER_ID, $warnings[0][2]['customer_id']);
+        $this->assertArrayHasKey('tag_id', $warnings[0][2]);
     }
 
     /**

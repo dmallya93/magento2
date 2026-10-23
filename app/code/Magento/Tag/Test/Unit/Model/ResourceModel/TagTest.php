@@ -492,6 +492,11 @@ class TagTest extends TestCase
         $this->assertSame($this->resource, $this->invokeAfterSave($tag));
 
         $this->assertSame([], $this->logsByOperation('tag.name.duplicate_detected'));
+        $failures = $this->logsByOperation('tag.name.duplicate_check');
+        $this->assertCount(1, $failures);
+        $this->assertSame('warning', $failures[0][0]);
+        $this->assertSame('tag.name.duplicate_check_failed', $failures[0][2]['error_code']);
+        $this->assertSame(40, $failures[0][2]['tag_id']);
     }
 
     /**
